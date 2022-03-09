@@ -80,5 +80,9 @@
     "firefox 63",
     "edge 79",
     "safari 13.1"
-  ]
+  ],
+  "dependencies": {
+    "@xstate/react": "^2.0.1",
+    "xstate": "^4.30.5"
+  }
 }
