@@ -1,6 +1,6 @@
 import { mutate } from "swr"
 
-interface LoginResponse {
+export interface LoginResponse {
   session_token: string
 }
 
