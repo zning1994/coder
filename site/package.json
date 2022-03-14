@@ -82,6 +82,7 @@
     "safari 13.1"
   ],
   "dependencies": {
+    "@xstate/cli": "^0.1.4",
     "@xstate/react": "^2.0.1",
     "xstate": "^4.30.5"
   }
