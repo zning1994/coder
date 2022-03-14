@@ -1,7 +1,7 @@
-import React, { useEffect } from "react"
+import React from "react"
 import { makeStyles } from "@material-ui/core/styles"
 import Paper from "@material-ui/core/Paper"
-import { Link, useHistory } from "react-router-dom"
+import { Link, Navigate, useLocation } from "react-router-dom"
 import { EmptyState } from "../../components"
 import { ErrorSummary } from "../../components/ErrorSummary"
 import { Navbar } from "../../components/Navbar"
@@ -14,25 +14,23 @@ import { Organization, Project } from "./../../api"
 import useSWR from "swr"
 import { CodeExample } from "../../components/CodeExample/CodeExample"
 import { useActor } from "@xstate/react"
-import { userService } from "../../services/userService"
+import { userService } from "../../services/user/userService"
 
 const ProjectsPage: React.FC = () => {
   const styles = useStyles()
+  const location = useLocation()
   const [userState, userSend] = useActor(userService)
-  const { me, shouldRedirect } = userState.context
-  const history = useHistory()
+  const { error: userError, me } = userState.context
   const { data: orgs, error: orgsError } = useSWR<Organization[], Error>("/api/v2/users/me/organizations")
   const { data: projects, error } = useSWR<Project[] | null, Error>(
     orgs ? `/api/v2/organizations/${orgs[0].id}/projects` : null,
   )
 
-  useEffect(() => {
-    if (shouldRedirect)  {
-      history.push('/login')
-    }
-  }, [shouldRedirect])
+  if (userState.matches("signedOut")) {
+    return <Navigate to={"/login?redirect=" + encodeURIComponent(location.pathname)} />
+  }
 
-  if (error) {
+  if (userError) {
     return <ErrorSummary error={error} />
   }
 

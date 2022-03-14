@@ -1,15 +1,15 @@
 import { makeStyles } from "@material-ui/core/styles"
 import { FormikContextType, useFormik } from "formik"
 import { Location } from "history"
-import { useNavigate, useLocation } from "react-router-dom"
+import { useLocation, Navigate } from "react-router-dom"
 import React from "react"
-import { useSWRConfig } from "swr"
 import * as Yup from "yup"
 
 import { Welcome } from "./Welcome"
 import { FormTextField } from "../Form"
-import * as API from "./../../api"
 import { LoadingButton } from "./../Button"
+import { useActor } from "@xstate/react"
+import { userService } from "../../services/user/userService"
 
 /**
  * BuiltInAuthFormValues describes a form using built-in (email/password)
@@ -40,17 +40,12 @@ const useStyles = makeStyles((theme) => ({
   },
 }))
 
-export interface SignInProps {
-  loginHandler?: (email: string, password: string) => Promise<void>
-}
+const errorMessage = "The username or password is incorrect."
 
-export const SignInForm: React.FC<SignInProps> = ({
-  loginHandler = (email: string, password: string) => API.login(email, password),
-}) => {
-  const navigate = useNavigate()
+export const SignInForm: React.FC = () => {
   const location = useLocation()
   const styles = useStyles()
-  const { mutate } = useSWRConfig()
+  const [userState, userSend] = useActor(userService)
 
   const form: FormikContextType<BuiltInAuthFormValues> = useFormik<BuiltInAuthFormValues>({
     initialValues: {
@@ -59,18 +54,13 @@ export const SignInForm: React.FC<SignInProps> = ({
     },
     validationSchema,
     onSubmit: async ({ email, password }, helpers) => {
-      try {
-        await loginHandler(email, password)
-        // Tell SWR to invalidate the cache for the user endpoint
-        await mutate("/api/v2/users/me")
-
-        const redirect = getRedirectFromLocation(location)
-        await navigate(redirect)
-      } catch (err) {
-        helpers.setFieldError("password", "The username or password is incorrect.")
-      }
+      userSend({ type: "SIGN_IN", email, password })
     },
   })
+
+  if (userState.matches('signedIn') && userState.context.me) {
+    return <Navigate to={getRedirectFromLocation(location)} />
+  }
 
   return (
     <>
@@ -103,12 +93,13 @@ export const SignInForm: React.FC<SignInProps> = ({
             isPassword
             placeholder="Password"
             variant="outlined"
+            helperText={userState.context.error ? errorMessage : undefined}
           />
         </div>
         <div className={styles.submitBtn}>
           <LoadingButton
             color="primary"
-            loading={form.isSubmitting}
+            loading={userState.hasTag("loading")}
             fullWidth
             id="signin-form-submit"
             type="submit"
