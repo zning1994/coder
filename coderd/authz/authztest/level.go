@@ -2,16 +2,16 @@ package authztest
 
 import "github.com/coder/coder/coderd/authz"
 
-type level string
+type LevelKey string
 
 const (
-	LevelWildKey   level = "level-wild"
-	LevelSiteKey   level = "level-site"
-	LevelOrgKey    level = "level-org"
-	LevelOrgMemKey level = "level-org:mem"
+	LevelWildKey   LevelKey = "level-wild"
+	LevelSiteKey   LevelKey = "level-site"
+	LevelOrgKey    LevelKey = "level-org"
+	LevelOrgMemKey LevelKey = "level-org:mem"
 	// LevelOrgAllKey is a helper to get both org levels above
-	LevelOrgAllKey level = "level-org:*"
-	LevelUserKey   level = "level-user"
+	LevelOrgAllKey LevelKey = "level-org:*"
+	LevelUserKey   LevelKey = "level-user"
 )
 
 // LevelGroup is all permissions for a given level
@@ -43,7 +43,7 @@ func (lg LevelGroup) Abstain() Set {
 
 func GroupedPermissions(perms Set) SetGroup {
 	groups := make(SetGroup)
-	allLevelKeys := []level{LevelWildKey, LevelSiteKey, LevelOrgKey, LevelOrgMemKey, LevelOrgAllKey, LevelUserKey}
+	allLevelKeys := []LevelKey{LevelWildKey, LevelSiteKey, LevelOrgKey, LevelOrgMemKey, LevelOrgAllKey, LevelUserKey}
 
 	for _, l := range allLevelKeys {
 		groups[l] = make(LevelGroup)
@@ -71,7 +71,11 @@ func GroupedPermissions(perms Set) SetGroup {
 	return groups
 }
 
-type SetGroup map[level]LevelGroup
+type SetGroup map[LevelKey]LevelGroup
+
+func (s SetGroup) Level(k LevelKey) LevelGroup {
+	return s[k]
+}
 
 func (s SetGroup) Wildcard() LevelGroup {
 	return s[LevelWildKey]

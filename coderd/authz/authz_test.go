@@ -12,80 +12,64 @@ var nilSet = authztest.Set{nil}
 func Test_ExhaustiveAuthorize(t *testing.T) {
 	all := authztest.GroupedPermissions(authztest.AllPermissions())
 	variants := permissionVariants(all)
+	var total int
 	for name, v := range variants {
 		fmt.Printf("%s: %d\n", name, v.Size())
+		total += v.Size()
 	}
+	fmt.Println(total)
 }
 
 func permissionVariants(all authztest.SetGroup) map[string]*authztest.Role {
-	// an is any noise above the impactful set
-	an := abstain
-	// ln is any noise below the impactful set
-	ln := positive | negative | abstain
-
 	// Cases are X+/- where X indicates the level where the impactful set is.
 	// The impactful set determines the result.
-	return map[string]*authztest.Role{
-		// Wild
-		"W+": authztest.NewRole(
-			pos(all.Wildcard()),
-			noise(ln, all.Site(), all.Org(), all.User()),
-		),
-		"W-": authztest.NewRole(
-			neg(all.Wildcard()),
-			noise(ln, all.Site(), all.Org(), all.User()),
-		),
-		// Site
-		"S+": authztest.NewRole(
-			noise(an, all.Wildcard()),
-			pos(all.Site()),
-			noise(ln, all.Org(), all.User()),
-		),
-		"S-": authztest.NewRole(
-			noise(an, all.Wildcard()),
-			neg(all.Site()),
-			noise(ln, all.Org(), all.User()),
-		),
-		// TODO: Figure out cross org noise between org:* and org:mem
-		// Org:*
-		"O+": authztest.NewRole(
-			noise(an, all.Wildcard(), all.Site()),
-			pos(all.Org()),
-			noise(ln, all.User()),
-		),
-		"O-": authztest.NewRole(
-			noise(an, all.Wildcard(), all.Site()),
-			neg(all.Org()),
-			noise(ln, all.User()),
-		),
-		// Org:Mem
-		"M+": authztest.NewRole(
-			noise(an, all.Wildcard(), all.Site()),
-			pos(all.OrgMem()),
-			noise(ln, all.User()),
-		),
-		"M-": authztest.NewRole(
-			noise(an, all.Wildcard(), all.Site()),
-			neg(all.OrgMem()),
-			noise(ln, all.User()),
-		),
-		// User
-		"U+": authztest.NewRole(
-			noise(an, all.Wildcard(), all.Site(), all.Org()),
-			pos(all.User()),
-		),
-		"U-": authztest.NewRole(
-			noise(an, all.Wildcard(), all.Site(), all.Org()),
-			neg(all.User()),
-		),
-	}
+	variants := make(map[string]*authztest.Role)
+	assignVariants(variants, "W", authztest.LevelWildKey, all)
+	assignVariants(variants, "S", authztest.LevelSiteKey, all)
+	assignVariants(variants, "O", authztest.LevelOrgKey, all)
+	assignVariants(variants, "M", authztest.LevelOrgMemKey, all)
+	assignVariants(variants, "U", authztest.LevelUserKey, all)
+	return variants
 }
 
-func l() {
-	//authztest.Levels
-	//noise(an, all.Wildcard()),
-	//	neg(all.Site()),
-	//	noise(ln, all.Org(), all.User()),
+func assignVariants(m map[string]*authztest.Role, name string, lvl authztest.LevelKey, all authztest.SetGroup) {
+	vs := levelVariants(lvl, all)
+	m[name+"+"] = vs[0]
+	m[name+"-"] = vs[1]
+}
+
+func levelVariants(lvl authztest.LevelKey, all authztest.SetGroup) []*authztest.Role {
+	ordered := []authztest.LevelKey{
+		authztest.LevelWildKey,
+		authztest.LevelSiteKey,
+		// TODO: @emyrk orgs are special where the noise flags have to change
+		//		since these two levels are the same. The current code does
+		//		not handle this correctly.
+		authztest.LevelOrgKey,
+		authztest.LevelOrgMemKey,
+		authztest.LevelUserKey,
+	}
+
+	noiseFlag := abstain
+	sets := make([]authztest.Iterable, 0)
+	for _, l := range ordered {
+		if l == lvl {
+			noiseFlag = positive | negative | abstain
+			continue
+		}
+		sets = append(sets, noise(noiseFlag, all.Level(l)))
+	}
+
+	// clone the sets so we can get 2 sets. One for positive, one for negative
+	clone := make([]authztest.Iterable, len(sets))
+	copy(clone, sets)
+	p := append(clone, pos(all.Level(lvl)))
+	n := append(sets, neg(all.Level(lvl)))
+
+	return []*authztest.Role{
+		authztest.NewRole(p...),
+		authztest.NewRole(n...),
+	}
 }
 
 // pos returns the positive impactful variant for a given level. It does not
