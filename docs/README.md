@@ -10,57 +10,60 @@ Provision remote development environments with Terraform.
 - Start writing code with a single command
 - Use one of many [examples](./examples) to get started
 
-## Getting Started
+## Quickstart
 
-Install [the latest release](https://github.com/coder/coder/releases).
+Coder has two key concepts: *templates* and *workspaces*. Once templates are added in your deployment, users can create workspaces and start coding.
 
-To tinker, start with dev-mode (all data is in-memory, and is destroyed on exit):
+1. Install [the latest release](https://github.com/coder/coder/releases).
 
-```bash
-$ coder start --dev
-```
+2. To tinker, start with dev-mode (all data is in-memory, and is destroyed on exit):
 
-To run a production deployment with PostgreSQL:
+    ```bash
+    coder start --dev
+    ```
 
-```bash
-$ CODER_PG_CONNECTION_URL="postgres://<username>@<host>/<database>?password=<password>" \
-    coder start
-```
+3. In a new terminal, create a new template (eg. Develop in Linux on Google Cloud):
 
-To run as a system service, install with `.deb` or `.rpm`:
+    ```sh
+    coder templates init
+    cd <template-name>
+    coder templates create
+    ```
 
-```bash
-# Edit the configuration!
-$ sudo vim /etc/coder.d/coder.env
-$ sudo service coder restart
-```
+4. Create a new workspace and SSH in:
 
-### Your First Workspace
+    ```sh
+    coder workspaces create my-first-workspace
+    coder ssh my-first-workspace
+    ```
 
-In a new terminal, create a new project (eg. Develop in Linux on Google Cloud):
-
-```
-$ coder templates init
-$ coder templates create
-```
-
-Create a new workspace and SSH in:
-
-```
-$ coder workspaces create my-first-workspace
-$ coder ssh my-first-workspace
-```
-
-### Working with Projects
-
-You can edit the Terraform from a sample project:
+Under the hood, templates are Terraform code. Make changes to templates if necessary, or stick to the production-ready examples. 
 
 ```sh
-$ coder templates init
-$ cd gcp-linux/
-$ vim main.tf
-$ coder templates update gcp-linux
+cd <template-name>
+# edit the template
+vim main.tf
+coder templates update <template-name>
 ```
+
+Coder keeps your fleet of workspaces up-to-date and in-sync.
+
+## Documentation
+
+- [About Coder](./about)
+   - [Architecture](./comparison.md)
+   - [Coder vs. (other tool)](./comparison.md)
+- [Installation](./installation)
+- [Web UI vs. CLI](./web-cli.md)
+- [Templates](./templates)
+   - [Persistant vs. ephemeral](./templates/state.md)
+   - [Troubleshooting](./templates/troubleshooting.md)
+- [Workspaces](./workspaces)
+  - [Supported IDEs](./workspaces/IDEs.md)
+- [Users & Organizations](./users)
+  - [Roles](./users/roles.md)
+  - [SSH keys (for git)](./users/dotfiles.md)
+  - [Dotfiles](./users/dotfiles.md) 
 
 ## Contributing
 
