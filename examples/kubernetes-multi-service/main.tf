@@ -38,6 +38,10 @@ resource "kubernetes_pod" "main" {
     name = "coder-${data.coder_workspace.me.owner}-${data.coder_workspace.me.name}"
   }
   spec {
+    security_context {
+      run_as_user = 1000
+      fs_group    = 1000
+    }
     container {
       name    = "go"
       image   = "mcr.microsoft.com/vscode/devcontainers/go:1"
@@ -48,6 +52,10 @@ resource "kubernetes_pod" "main" {
       env {
         name  = "CODER_TOKEN"
         value = coder_agent.go.token
+      }
+      volume_mount {
+        mount_path = "/home/vscode"
+        name       = "home-directory"
       }
     }
     container {
@@ -61,6 +69,10 @@ resource "kubernetes_pod" "main" {
         name  = "CODER_TOKEN"
         value = coder_agent.java.token
       }
+      volume_mount {
+        mount_path = "/home/vscode"
+        name       = "home-directory"
+      }
     }
     container {
       name    = "ubuntu"
@@ -72,6 +84,31 @@ resource "kubernetes_pod" "main" {
       env {
         name  = "CODER_TOKEN"
         value = coder_agent.ubuntu.token
+      }
+      volume_mount {
+        mount_path = "/home/vscode"
+        name       = "home-directory"
+      }
+    }
+    volume {
+      name = "home-directory"
+      persistent_volume_claim {
+        claim_name = kubernetes_persistent_volume_claim.home-directory.metadata.0.name
+      }
+    }
+  }
+}
+
+resource "kubernetes_persistent_volume_claim" "home-directory" {
+  metadata {
+    name = "coder-pvc-${data.coder_workspace.me.owner}-${data.coder_workspace.me.name}"
+  }
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        # TODO: turn these into variables
+        storage = "5Gi"
       }
     }
   }
