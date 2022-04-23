@@ -73,6 +73,7 @@ func Root() *cobra.Command {
 		workspaceTunnel(),
 		gitssh(),
 		publickey(),
+		vscode(),
 		workspaceAgent(),
 	)
 
