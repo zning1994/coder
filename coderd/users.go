@@ -324,7 +324,7 @@ func (api *api) postUsers(rw http.ResponseWriter, r *http.Request) {
 
 // Returns the parameterized user requested. All validation
 // is completed in the middleware for this route.
-func (*api) userByName(rw http.ResponseWriter, r *http.Request) {
+func (*api) user(rw http.ResponseWriter, r *http.Request) {
 	user := httpmw.UserParam(r)
 
 	httpapi.Write(rw, http.StatusOK, convertUser(user))
@@ -841,86 +841,13 @@ func (api *api) workspacesByUser(rw http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	workspaceIDs := make([]uuid.UUID, 0, len(workspaces))
-	templateIDs := make([]uuid.UUID, 0, len(workspaces))
-	for _, workspace := range workspaces {
-		workspaceIDs = append(workspaceIDs, workspace.ID)
-		templateIDs = append(templateIDs, workspace.TemplateID)
-	}
-	workspaceBuilds, err := api.Database.GetWorkspaceBuildsByWorkspaceIDsWithoutAfter(r.Context(), workspaceIDs)
-	if errors.Is(err, sql.ErrNoRows) {
-		err = nil
-	}
+	apiWorkspaces, err := convertWorkspaces(r.Context(), api.Database, workspaces)
 	if err != nil {
 		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: fmt.Sprintf("get workspace builds: %s", err),
+			Message: fmt.Sprintf("convert workspaces: %s", err),
 		})
 		return
 	}
-	templates, err := api.Database.GetTemplatesByIDs(r.Context(), templateIDs)
-	if errors.Is(err, sql.ErrNoRows) {
-		err = nil
-	}
-	if err != nil {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: fmt.Sprintf("get templates: %s", err),
-		})
-		return
-	}
-	jobIDs := make([]uuid.UUID, 0, len(workspaceBuilds))
-	for _, build := range workspaceBuilds {
-		jobIDs = append(jobIDs, build.JobID)
-	}
-	jobs, err := api.Database.GetProvisionerJobsByIDs(r.Context(), jobIDs)
-	if errors.Is(err, sql.ErrNoRows) {
-		err = nil
-	}
-	if err != nil {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: fmt.Sprintf("get provisioner jobs: %s", err),
-		})
-		return
-	}
-
-	buildByWorkspaceID := map[uuid.UUID]database.WorkspaceBuild{}
-	for _, workspaceBuild := range workspaceBuilds {
-		buildByWorkspaceID[workspaceBuild.WorkspaceID] = workspaceBuild
-	}
-	templateByID := map[uuid.UUID]database.Template{}
-	for _, template := range templates {
-		templateByID[template.ID] = template
-	}
-	jobByID := map[uuid.UUID]database.ProvisionerJob{}
-	for _, job := range jobs {
-		jobByID[job.ID] = job
-	}
-	apiWorkspaces := make([]codersdk.Workspace, 0, len(workspaces))
-	for _, workspace := range workspaces {
-		build, exists := buildByWorkspaceID[workspace.ID]
-		if !exists {
-			httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-				Message: fmt.Sprintf("build not found for workspace %q", workspace.Name),
-			})
-			return
-		}
-		template, exists := templateByID[workspace.TemplateID]
-		if !exists {
-			httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-				Message: fmt.Sprintf("template not found for workspace %q", workspace.Name),
-			})
-			return
-		}
-		job, exists := jobByID[build.JobID]
-		if !exists {
-			httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-				Message: fmt.Sprintf("build job not found for workspace %q", workspace.Name),
-			})
-			return
-		}
-		apiWorkspaces = append(apiWorkspaces,
-			convertWorkspace(workspace, convertWorkspaceBuild(build, convertProvisionerJob(job)), template))
-	}
-
 	httpapi.Write(rw, http.StatusOK, apiWorkspaces)
 }
 

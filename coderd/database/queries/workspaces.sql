@@ -8,6 +8,12 @@ WHERE
 LIMIT
 	1;
 
+-- name: GetWorkspaces :many
+SELECT
+	*
+FROM
+	workspaces;
+
 -- name: GetWorkspacesByTemplateID :many
 SELECT
 	*

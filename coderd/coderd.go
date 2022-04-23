@@ -107,6 +107,9 @@ func New(options *Options) (http.Handler, func()) {
 				r.Get("/", api.templatesByOrganization)
 				r.Get("/{templatename}", api.templateByOrganizationAndName)
 			})
+			r.Route("/members", func(r chi.Router) {
+				r.Get("/{username}", api.organizationMemberByUsername)
+			})
 		})
 		r.Route("/parameters/{scope}/{id}", func(r chi.Router) {
 			r.Use(httpmw.ExtractAPIKey(options.Database, nil))
@@ -160,7 +163,7 @@ func New(options *Options) (http.Handler, func()) {
 				r.Get("/", api.users)
 				r.Route("/{user}", func(r chi.Router) {
 					r.Use(httpmw.ExtractUserParam(options.Database))
-					r.Get("/", api.userByName)
+					r.Get("/", api.user)
 					r.Put("/profile", api.putUserProfile)
 					r.Get("/organizations", api.organizationsByUser)
 					r.Post("/organizations", api.postOrganizationsByUser)
@@ -180,6 +183,7 @@ func New(options *Options) (http.Handler, func()) {
 				})
 			})
 		})
+
 		r.Route("/workspaceagents", func(r chi.Router) {
 			r.Post("/azure-instance-identity", api.postWorkspaceAuthAzureInstanceIdentity)
 			r.Post("/aws-instance-identity", api.postWorkspaceAuthAWSInstanceIdentity)
@@ -210,22 +214,23 @@ func New(options *Options) (http.Handler, func()) {
 			)
 			r.Get("/", api.workspaceResource)
 		})
-		r.Route("/workspaces/{workspace}", func(r chi.Router) {
-			r.Use(
-				httpmw.ExtractAPIKey(options.Database, nil),
-				httpmw.ExtractWorkspaceParam(options.Database),
-			)
-			r.Get("/", api.workspace)
-			r.Route("/builds", func(r chi.Router) {
-				r.Get("/", api.workspaceBuilds)
-				r.Post("/", api.postWorkspaceBuilds)
-				r.Get("/{workspacebuildname}", api.workspaceBuildByName)
-			})
-			r.Route("/autostart", func(r chi.Router) {
-				r.Put("/", api.putWorkspaceAutostart)
-			})
-			r.Route("/autostop", func(r chi.Router) {
-				r.Put("/", api.putWorkspaceAutostop)
+		r.Route("/workspaces", func(r chi.Router) {
+			r.Use(httpmw.ExtractAPIKey(options.Database, nil))
+			r.Get("/", api.workspaces)
+			r.Route("/{workspace}", func(r chi.Router) {
+				r.Use(httpmw.ExtractWorkspaceParam(options.Database))
+				r.Get("/", api.workspace)
+				r.Route("/builds", func(r chi.Router) {
+					r.Get("/", api.workspaceBuilds)
+					r.Post("/", api.postWorkspaceBuilds)
+					r.Get("/{workspacebuildname}", api.workspaceBuildByName)
+				})
+				r.Route("/autostart", func(r chi.Router) {
+					r.Put("/", api.putWorkspaceAutostart)
+				})
+				r.Route("/autostop", func(r chi.Router) {
+					r.Put("/", api.putWorkspaceAutostop)
+				})
 			})
 		})
 		r.Route("/workspacebuilds/{workspacebuild}", func(r chi.Router) {

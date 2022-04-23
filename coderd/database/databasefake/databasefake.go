@@ -233,6 +233,13 @@ func (q *fakeQuerier) GetUsers(_ context.Context, params database.GetUsersParams
 	return tmp, nil
 }
 
+func (q *fakeQuerier) GetWorkspaces(_ context.Context) ([]database.Workspace, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	return q.workspaces, nil
+}
+
 func (q *fakeQuerier) GetWorkspacesByTemplateID(_ context.Context, arg database.GetWorkspacesByTemplateIDParams) ([]database.Workspace, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()

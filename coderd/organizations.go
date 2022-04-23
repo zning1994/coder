@@ -22,6 +22,45 @@ func (*api) organization(rw http.ResponseWriter, r *http.Request) {
 	httpapi.Write(rw, http.StatusOK, convertOrganization(organization))
 }
 
+func (api *api) organizationMemberByUsername(rw http.ResponseWriter, r *http.Request) {
+	organization := httpmw.OrganizationParam(r)
+
+	user, err := api.Database.GetUserByEmailOrUsername(r.Context(), database.GetUserByEmailOrUsernameParams{
+		Username: chi.URLParam(r, "username"),
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		httpapi.Write(rw, http.StatusNotFound, httpapi.Response{
+			Message: "User doesn't exist with that name!",
+		})
+		return
+	}
+	if err != nil {
+		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
+			Message: fmt.Sprintf("get user by email: %s", err),
+		})
+		return
+	}
+
+	member, err := api.Database.GetOrganizationMemberByUserID(r.Context(), database.GetOrganizationMemberByUserIDParams{
+		OrganizationID: organization.ID,
+		UserID:         user.ID,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		httpapi.Write(rw, http.StatusForbidden, httpapi.Response{
+			Message: "User is not a member of this organization!",
+		})
+		return
+	}
+	if err != nil {
+		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
+			Message: fmt.Sprintf("get organization member: %s", err),
+		})
+		return
+	}
+
+	httpapi.Write(rw, http.StatusOK, member)
+}
+
 func (api *api) provisionerDaemonsByOrganization(rw http.ResponseWriter, r *http.Request) {
 	daemons, err := api.Database.GetProvisionerDaemons(r.Context())
 	if errors.Is(err, sql.ErrNoRows) {

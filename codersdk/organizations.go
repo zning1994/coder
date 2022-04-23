@@ -21,6 +21,13 @@ type Organization struct {
 	UpdatedAt time.Time `json:"updated_at" validate:"required"`
 }
 
+type OrganizationMember struct {
+	UserID         uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 // CreateTemplateVersionRequest enables callers to create a new Template Version.
 type CreateTemplateVersionRequest struct {
 	// TemplateID optionally associates a version with a template.
@@ -61,6 +68,25 @@ func (c *Client) Organization(ctx context.Context, id uuid.UUID) (Organization, 
 
 	var organization Organization
 	return organization, json.NewDecoder(res.Body).Decode(&organization)
+}
+
+// OrganizationMemberByUsername fetches a member of an organization by name.
+func (c *Client) OrganizationMemberByUsername(ctx context.Context, organizationID uuid.UUID, username string) (OrganizationMember, error) {
+	res, err := c.request(ctx, http.MethodGet,
+		fmt.Sprintf("/api/v2/organizations/%s/members/%s", organizationID.String(), username),
+		nil,
+	)
+	if err != nil {
+		return OrganizationMember{}, xerrors.Errorf("execute request: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return OrganizationMember{}, readBodyAsError(res)
+	}
+
+	var member OrganizationMember
+	return member, json.NewDecoder(res.Body).Decode(&member)
 }
 
 // ProvisionerDaemonsByOrganization returns provisioner daemons available for an organization.

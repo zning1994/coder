@@ -187,3 +187,24 @@ func TestTemplateByOrganizationAndName(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestOrganizationMemberByUsername(t *testing.T) {
+	t.Parallel()
+	t.Run("NotExist", func(t *testing.T) {
+		t.Parallel()
+		client := coderdtest.New(t, nil)
+		user := coderdtest.CreateFirstUser(t, client)
+		_, err := client.OrganizationMemberByUsername(context.Background(), user.OrganizationID, "someone")
+		var apiErr *codersdk.Error
+		require.ErrorAs(t, err, &apiErr)
+		require.Equal(t, http.StatusNotFound, apiErr.StatusCode())
+	})
+	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
+		client := coderdtest.New(t, nil)
+		user := coderdtest.CreateFirstUser(t, client)
+		me, _ := client.User(context.Background(), codersdk.Me)
+		_, err := client.OrganizationMemberByUsername(context.Background(), user.OrganizationID, me.Username)
+		require.NoError(t, err)
+	})
+}

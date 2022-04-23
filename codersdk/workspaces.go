@@ -36,6 +36,20 @@ type CreateWorkspaceBuildRequest struct {
 	DryRun            bool                         `json:"dry_run"`
 }
 
+// Workspaces returns all workspaces for a deployment.
+func (c *Client) Workspaces(ctx context.Context) ([]Workspace, error) {
+	res, err := c.request(ctx, http.MethodGet, "/api/v2/workspaces", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, readBodyAsError(res)
+	}
+	var workspaces []Workspace
+	return workspaces, json.NewDecoder(res.Body).Decode(&workspaces)
+}
+
 // Workspace returns a single workspace.
 func (c *Client) Workspace(ctx context.Context, id uuid.UUID) (Workspace, error) {
 	res, err := c.request(ctx, http.MethodGet, fmt.Sprintf("/api/v2/workspaces/%s", id), nil)
