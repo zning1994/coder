@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/moby/moby/pkg/namesgenerator"
 	"github.com/spf13/cobra"
 	"golang.org/x/xerrors"
 
@@ -227,6 +229,31 @@ func main() {
 				HideAgentState: false,
 				HideAccess:     false,
 			})
+		},
+	})
+
+	root.AddCommand(&cobra.Command{
+		Use: "templateversions",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			activeID := uuid.New()
+			return cliui.TemplateVersions(cmd.OutOrStdout(), codersdk.Template{
+				Name:            "gcp-linux",
+				ActiveVersionID: activeID,
+			}, []codersdk.TemplateVersion{{
+				ID:        activeID,
+				Name:      namesgenerator.GetRandomName(1),
+				CreatedAt: database.Now(),
+				Job: codersdk.ProvisionerJob{
+					Status: codersdk.ProvisionerJobSucceeded,
+				},
+			}, {
+				ID:        uuid.New(),
+				Name:      namesgenerator.GetRandomName(1),
+				CreatedAt: database.Now(),
+				Job: codersdk.ProvisionerJob{
+					Status: codersdk.ProvisionerJobFailed,
+				},
+			}})
 		},
 	})
 
