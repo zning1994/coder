@@ -39,7 +39,7 @@ describe("UserDropdown", () => {
       throw new Error("Anchor tag not found for the documentation menu item")
     }
 
-    expect(link.getAttribute("href")).toBe("https://coder.com/docs")
+    expect(link.getAttribute("href")).toBe("https://github.com/coder/coder/tree/main/docs")
   })
 
   it("has the correct link for the account item", async () => {
