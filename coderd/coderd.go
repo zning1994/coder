@@ -42,6 +42,7 @@ type Options struct {
 	AWSCertificates      awsidentity.Certificates
 	AzureCertificates    x509.VerifyOptions
 	GoogleTokenValidator *idtoken.Validator
+	GithubOAuth2Config   *GithubOAuth2Config
 	ICEServers           []webrtc.ICEServer
 	SecureAuthCookie     bool
 	SSHKeygenAlgorithm   gitsshkey.Algorithm
@@ -62,6 +63,9 @@ func New(options *Options) (http.Handler, func()) {
 	api := &api{
 		Options: options,
 	}
+	apiKeyMiddleware := httpmw.ExtractAPIKey(options.Database, &httpmw.OAuth2Configs{
+		Github: options.GithubOAuth2Config,
+	})
 
 	r := chi.NewRouter()
 	r.Route("/api/v2", func(r chi.Router) {
@@ -86,7 +90,7 @@ func New(options *Options) (http.Handler, func()) {
 		})
 		r.Route("/files", func(r chi.Router) {
 			r.Use(
-				httpmw.ExtractAPIKey(options.Database, nil),
+				apiKeyMiddleware,
 				// This number is arbitrary, but reading/writing
 				// file content is expensive so it should be small.
 				httpmw.RateLimitPerMinute(12),
@@ -96,7 +100,7 @@ func New(options *Options) (http.Handler, func()) {
 		})
 		r.Route("/organizations/{organization}", func(r chi.Router) {
 			r.Use(
-				httpmw.ExtractAPIKey(options.Database, nil),
+				apiKeyMiddleware,
 				httpmw.ExtractOrganizationParam(options.Database),
 			)
 			r.Get("/", api.organization)
@@ -107,9 +111,26 @@ func New(options *Options) (http.Handler, func()) {
 				r.Get("/", api.templatesByOrganization)
 				r.Get("/{templatename}", api.templateByOrganizationAndName)
 			})
+			r.Route("/workspaces", func(r chi.Router) {
+				r.Post("/", api.postWorkspacesByOrganization)
+				r.Get("/", api.workspacesByOrganization)
+				r.Route("/{user}", func(r chi.Router) {
+					r.Use(httpmw.ExtractUserParam(options.Database))
+					r.Get("/{workspace}", api.workspaceByOwnerAndName)
+					r.Get("/", api.workspacesByOwner)
+				})
+			})
+			r.Route("/members", func(r chi.Router) {
+				r.Route("/{user}", func(r chi.Router) {
+					r.Use(
+						httpmw.ExtractUserParam(options.Database),
+					)
+					r.Put("/roles", api.putMemberRoles)
+				})
+			})
 		})
 		r.Route("/parameters/{scope}/{id}", func(r chi.Router) {
-			r.Use(httpmw.ExtractAPIKey(options.Database, nil))
+			r.Use(apiKeyMiddleware)
 			r.Post("/", api.postParameter)
 			r.Get("/", api.parameters)
 			r.Route("/{name}", func(r chi.Router) {
@@ -118,7 +139,7 @@ func New(options *Options) (http.Handler, func()) {
 		})
 		r.Route("/templates/{template}", func(r chi.Router) {
 			r.Use(
-				httpmw.ExtractAPIKey(options.Database, nil),
+				apiKeyMiddleware,
 				httpmw.ExtractTemplateParam(options.Database),
 				httpmw.ExtractOrganizationParam(options.Database),
 			)
@@ -132,7 +153,7 @@ func New(options *Options) (http.Handler, func()) {
 		})
 		r.Route("/templateversions/{templateversion}", func(r chi.Router) {
 			r.Use(
-				httpmw.ExtractAPIKey(options.Database, nil),
+				apiKeyMiddleware,
 				httpmw.ExtractTemplateVersionParam(options.Database),
 				httpmw.ExtractOrganizationParam(options.Database),
 			)
@@ -154,14 +175,26 @@ func New(options *Options) (http.Handler, func()) {
 			r.Post("/first", api.postFirstUser)
 			r.Post("/login", api.postLogin)
 			r.Post("/logout", api.postLogout)
+			r.Get("/authmethods", api.userAuthMethods)
+			r.Route("/oauth2", func(r chi.Router) {
+				r.Route("/github", func(r chi.Router) {
+					r.Use(httpmw.ExtractOAuth2(options.GithubOAuth2Config))
+					r.Get("/callback", api.userOAuth2Github)
+				})
+			})
 			r.Group(func(r chi.Router) {
-				r.Use(httpmw.ExtractAPIKey(options.Database, nil))
-				r.Post("/", api.postUsers)
+				r.Use(apiKeyMiddleware)
+				r.Post("/", api.postUser)
 				r.Get("/", api.users)
 				r.Route("/{user}", func(r chi.Router) {
 					r.Use(httpmw.ExtractUserParam(options.Database))
 					r.Get("/", api.userByName)
 					r.Put("/profile", api.putUserProfile)
+					r.Put("/suspend", api.putUserSuspend)
+					// TODO: @emyrk Might want to move these to a /roles group instead of /user.
+					//		As we include more roles like org roles, it makes less sense to scope these here.
+					r.Put("/roles", api.putUserRoles)
+					r.Get("/roles", api.userRoles)
 					r.Get("/organizations", api.organizationsByUser)
 					r.Post("/organizations", api.postOrganizationsByUser)
 					r.Post("/keys", api.postAPIKey)
@@ -169,11 +202,6 @@ func New(options *Options) (http.Handler, func()) {
 						r.Post("/", api.postOrganizationsByUser)
 						r.Get("/", api.organizationsByUser)
 						r.Get("/{organizationname}", api.organizationByUserAndName)
-					})
-					r.Route("/workspaces", func(r chi.Router) {
-						r.Post("/", api.postWorkspacesByUser)
-						r.Get("/", api.workspacesByUser)
-						r.Get("/{workspacename}", api.workspaceByUserAndName)
 					})
 					r.Get("/gitsshkey", api.gitSSHKey)
 					r.Put("/gitsshkey", api.regenerateGitSSHKey)
@@ -186,25 +214,27 @@ func New(options *Options) (http.Handler, func()) {
 			r.Post("/google-instance-identity", api.postWorkspaceAuthGoogleInstanceIdentity)
 			r.Route("/me", func(r chi.Router) {
 				r.Use(httpmw.ExtractWorkspaceAgent(options.Database))
-				r.Get("/", api.workspaceAgentListen)
+				r.Get("/metadata", api.workspaceAgentMetadata)
+				r.Get("/listen", api.workspaceAgentListen)
 				r.Get("/gitsshkey", api.agentGitSSHKey)
 				r.Get("/turn", api.workspaceAgentTurn)
 				r.Get("/iceservers", api.workspaceAgentICEServers)
 			})
 			r.Route("/{workspaceagent}", func(r chi.Router) {
 				r.Use(
-					httpmw.ExtractAPIKey(options.Database, nil),
+					apiKeyMiddleware,
 					httpmw.ExtractWorkspaceAgentParam(options.Database),
 				)
 				r.Get("/", api.workspaceAgent)
 				r.Get("/dial", api.workspaceAgentDial)
 				r.Get("/turn", api.workspaceAgentTurn)
+				r.Get("/pty", api.workspaceAgentPTY)
 				r.Get("/iceservers", api.workspaceAgentICEServers)
 			})
 		})
 		r.Route("/workspaceresources/{workspaceresource}", func(r chi.Router) {
 			r.Use(
-				httpmw.ExtractAPIKey(options.Database, nil),
+				apiKeyMiddleware,
 				httpmw.ExtractWorkspaceResourceParam(options.Database),
 				httpmw.ExtractWorkspaceParam(options.Database),
 			)
@@ -212,7 +242,7 @@ func New(options *Options) (http.Handler, func()) {
 		})
 		r.Route("/workspaces/{workspace}", func(r chi.Router) {
 			r.Use(
-				httpmw.ExtractAPIKey(options.Database, nil),
+				apiKeyMiddleware,
 				httpmw.ExtractWorkspaceParam(options.Database),
 			)
 			r.Get("/", api.workspace)
@@ -230,7 +260,7 @@ func New(options *Options) (http.Handler, func()) {
 		})
 		r.Route("/workspacebuilds/{workspacebuild}", func(r chi.Router) {
 			r.Use(
-				httpmw.ExtractAPIKey(options.Database, nil),
+				apiKeyMiddleware,
 				httpmw.ExtractWorkspaceBuildParam(options.Database),
 				httpmw.ExtractWorkspaceParam(options.Database),
 			)

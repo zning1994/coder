@@ -20,7 +20,11 @@ func workspaceList() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			workspaces, err := client.WorkspacesByUser(cmd.Context(), codersdk.Me)
+			organization, err := currentOrganization(cmd, client)
+			if err != nil {
+				return err
+			}
+			workspaces, err := client.WorkspacesByOwner(cmd.Context(), organization.ID, codersdk.Me)
 			if err != nil {
 				return err
 			}
@@ -71,7 +75,7 @@ func workspaceList() *cobra.Command {
 					workspace.Outdated,
 				})
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), tableWriter.Render())
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), tableWriter.Render())
 			return err
 		},
 	}
