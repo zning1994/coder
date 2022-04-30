@@ -15,7 +15,7 @@ import (
 
 const getAPIKeyByID = `-- name: GetAPIKeyByID :one
 SELECT
-	id, hashed_secret, user_id, application, name, last_used, expires_at, created_at, updated_at, login_type, oidc_access_token, oidc_refresh_token, oidc_id_token, oidc_expiry, devurl_token
+	id, hashed_secret, user_id, last_used, expires_at, created_at, updated_at, login_type, oauth_access_token, oauth_refresh_token, oauth_id_token, oauth_expiry
 FROM
 	api_keys
 WHERE
@@ -31,18 +31,15 @@ func (q *sqlQuerier) GetAPIKeyByID(ctx context.Context, id string) (APIKey, erro
 		&i.ID,
 		&i.HashedSecret,
 		&i.UserID,
-		&i.Application,
-		&i.Name,
 		&i.LastUsed,
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LoginType,
-		&i.OIDCAccessToken,
-		&i.OIDCRefreshToken,
-		&i.OIDCIDToken,
-		&i.OIDCExpiry,
-		&i.DevurlToken,
+		&i.OAuthAccessToken,
+		&i.OAuthRefreshToken,
+		&i.OAuthIDToken,
+		&i.OAuthExpiry,
 	)
 	return i, err
 }
@@ -53,55 +50,33 @@ INSERT INTO
 		id,
 		hashed_secret,
 		user_id,
-		application,
-		"name",
 		last_used,
 		expires_at,
 		created_at,
 		updated_at,
 		login_type,
-		oidc_access_token,
-		oidc_refresh_token,
-		oidc_id_token,
-		oidc_expiry,
-		devurl_token
+		oauth_access_token,
+		oauth_refresh_token,
+		oauth_id_token,
+		oauth_expiry
 	)
 VALUES
-	(
-		$1,
-		$2,
-		$3,
-		$4,
-		$5,
-		$6,
-		$7,
-		$8,
-		$9,
-		$10,
-		$11,
-		$12,
-		$13,
-		$14,
-		$15
-	) RETURNING id, hashed_secret, user_id, application, name, last_used, expires_at, created_at, updated_at, login_type, oidc_access_token, oidc_refresh_token, oidc_id_token, oidc_expiry, devurl_token
+	($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id, hashed_secret, user_id, last_used, expires_at, created_at, updated_at, login_type, oauth_access_token, oauth_refresh_token, oauth_id_token, oauth_expiry
 `
 
 type InsertAPIKeyParams struct {
-	ID               string    `db:"id" json:"id"`
-	HashedSecret     []byte    `db:"hashed_secret" json:"hashed_secret"`
-	UserID           uuid.UUID `db:"user_id" json:"user_id"`
-	Application      bool      `db:"application" json:"application"`
-	Name             string    `db:"name" json:"name"`
-	LastUsed         time.Time `db:"last_used" json:"last_used"`
-	ExpiresAt        time.Time `db:"expires_at" json:"expires_at"`
-	CreatedAt        time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt        time.Time `db:"updated_at" json:"updated_at"`
-	LoginType        LoginType `db:"login_type" json:"login_type"`
-	OIDCAccessToken  string    `db:"oidc_access_token" json:"oidc_access_token"`
-	OIDCRefreshToken string    `db:"oidc_refresh_token" json:"oidc_refresh_token"`
-	OIDCIDToken      string    `db:"oidc_id_token" json:"oidc_id_token"`
-	OIDCExpiry       time.Time `db:"oidc_expiry" json:"oidc_expiry"`
-	DevurlToken      bool      `db:"devurl_token" json:"devurl_token"`
+	ID                string    `db:"id" json:"id"`
+	HashedSecret      []byte    `db:"hashed_secret" json:"hashed_secret"`
+	UserID            uuid.UUID `db:"user_id" json:"user_id"`
+	LastUsed          time.Time `db:"last_used" json:"last_used"`
+	ExpiresAt         time.Time `db:"expires_at" json:"expires_at"`
+	CreatedAt         time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt         time.Time `db:"updated_at" json:"updated_at"`
+	LoginType         LoginType `db:"login_type" json:"login_type"`
+	OAuthAccessToken  string    `db:"oauth_access_token" json:"oauth_access_token"`
+	OAuthRefreshToken string    `db:"oauth_refresh_token" json:"oauth_refresh_token"`
+	OAuthIDToken      string    `db:"oauth_id_token" json:"oauth_id_token"`
+	OAuthExpiry       time.Time `db:"oauth_expiry" json:"oauth_expiry"`
 }
 
 func (q *sqlQuerier) InsertAPIKey(ctx context.Context, arg InsertAPIKeyParams) (APIKey, error) {
@@ -109,36 +84,30 @@ func (q *sqlQuerier) InsertAPIKey(ctx context.Context, arg InsertAPIKeyParams) (
 		arg.ID,
 		arg.HashedSecret,
 		arg.UserID,
-		arg.Application,
-		arg.Name,
 		arg.LastUsed,
 		arg.ExpiresAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 		arg.LoginType,
-		arg.OIDCAccessToken,
-		arg.OIDCRefreshToken,
-		arg.OIDCIDToken,
-		arg.OIDCExpiry,
-		arg.DevurlToken,
+		arg.OAuthAccessToken,
+		arg.OAuthRefreshToken,
+		arg.OAuthIDToken,
+		arg.OAuthExpiry,
 	)
 	var i APIKey
 	err := row.Scan(
 		&i.ID,
 		&i.HashedSecret,
 		&i.UserID,
-		&i.Application,
-		&i.Name,
 		&i.LastUsed,
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LoginType,
-		&i.OIDCAccessToken,
-		&i.OIDCRefreshToken,
-		&i.OIDCIDToken,
-		&i.OIDCExpiry,
-		&i.DevurlToken,
+		&i.OAuthAccessToken,
+		&i.OAuthRefreshToken,
+		&i.OAuthIDToken,
+		&i.OAuthExpiry,
 	)
 	return i, err
 }
@@ -149,20 +118,20 @@ UPDATE
 SET
 	last_used = $2,
 	expires_at = $3,
-	oidc_access_token = $4,
-	oidc_refresh_token = $5,
-	oidc_expiry = $6
+	oauth_access_token = $4,
+	oauth_refresh_token = $5,
+	oauth_expiry = $6
 WHERE
 	id = $1
 `
 
 type UpdateAPIKeyByIDParams struct {
-	ID               string    `db:"id" json:"id"`
-	LastUsed         time.Time `db:"last_used" json:"last_used"`
-	ExpiresAt        time.Time `db:"expires_at" json:"expires_at"`
-	OIDCAccessToken  string    `db:"oidc_access_token" json:"oidc_access_token"`
-	OIDCRefreshToken string    `db:"oidc_refresh_token" json:"oidc_refresh_token"`
-	OIDCExpiry       time.Time `db:"oidc_expiry" json:"oidc_expiry"`
+	ID                string    `db:"id" json:"id"`
+	LastUsed          time.Time `db:"last_used" json:"last_used"`
+	ExpiresAt         time.Time `db:"expires_at" json:"expires_at"`
+	OAuthAccessToken  string    `db:"oauth_access_token" json:"oauth_access_token"`
+	OAuthRefreshToken string    `db:"oauth_refresh_token" json:"oauth_refresh_token"`
+	OAuthExpiry       time.Time `db:"oauth_expiry" json:"oauth_expiry"`
 }
 
 func (q *sqlQuerier) UpdateAPIKeyByID(ctx context.Context, arg UpdateAPIKeyByIDParams) error {
@@ -170,9 +139,9 @@ func (q *sqlQuerier) UpdateAPIKeyByID(ctx context.Context, arg UpdateAPIKeyByIDP
 		arg.ID,
 		arg.LastUsed,
 		arg.ExpiresAt,
-		arg.OIDCAccessToken,
-		arg.OIDCRefreshToken,
-		arg.OIDCExpiry,
+		arg.OAuthAccessToken,
+		arg.OAuthRefreshToken,
+		arg.OAuthExpiry,
 	)
 	return err
 }
@@ -337,6 +306,45 @@ func (q *sqlQuerier) UpdateGitSSHKey(ctx context.Context, arg UpdateGitSSHKeyPar
 	return err
 }
 
+const getOrganizationIDsByMemberIDs = `-- name: GetOrganizationIDsByMemberIDs :many
+SELECT
+    user_id, array_agg(organization_id) :: uuid [ ] AS "organization_IDs"
+FROM
+    organization_members
+WHERE
+    user_id = ANY($1 :: uuid [ ])
+GROUP BY
+    user_id
+`
+
+type GetOrganizationIDsByMemberIDsRow struct {
+	UserID          uuid.UUID   `db:"user_id" json:"user_id"`
+	OrganizationIDs []uuid.UUID `db:"organization_IDs" json:"organization_IDs"`
+}
+
+func (q *sqlQuerier) GetOrganizationIDsByMemberIDs(ctx context.Context, ids []uuid.UUID) ([]GetOrganizationIDsByMemberIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getOrganizationIDsByMemberIDs, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetOrganizationIDsByMemberIDsRow
+	for rows.Next() {
+		var i GetOrganizationIDsByMemberIDsRow
+		if err := rows.Scan(&i.UserID, pq.Array(&i.OrganizationIDs)); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getOrganizationMemberByUserID = `-- name: GetOrganizationMemberByUserID :one
 SELECT
 	user_id, organization_id, created_at, updated_at, roles
@@ -365,6 +373,44 @@ func (q *sqlQuerier) GetOrganizationMemberByUserID(ctx context.Context, arg GetO
 		pq.Array(&i.Roles),
 	)
 	return i, err
+}
+
+const getOrganizationMembershipsByUserID = `-- name: GetOrganizationMembershipsByUserID :many
+SELECT
+	user_id, organization_id, created_at, updated_at, roles
+FROM
+	organization_members
+WHERE
+  user_id = $1
+`
+
+func (q *sqlQuerier) GetOrganizationMembershipsByUserID(ctx context.Context, userID uuid.UUID) ([]OrganizationMember, error) {
+	rows, err := q.db.QueryContext(ctx, getOrganizationMembershipsByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OrganizationMember
+	for rows.Next() {
+		var i OrganizationMember
+		if err := rows.Scan(
+			&i.UserID,
+			&i.OrganizationID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			pq.Array(&i.Roles),
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertOrganizationMember = `-- name: InsertOrganizationMember :one
@@ -396,6 +442,37 @@ func (q *sqlQuerier) InsertOrganizationMember(ctx context.Context, arg InsertOrg
 		arg.UpdatedAt,
 		pq.Array(arg.Roles),
 	)
+	var i OrganizationMember
+	err := row.Scan(
+		&i.UserID,
+		&i.OrganizationID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		pq.Array(&i.Roles),
+	)
+	return i, err
+}
+
+const updateMemberRoles = `-- name: UpdateMemberRoles :one
+UPDATE
+	organization_members
+SET
+	-- Remove all duplicates from the roles.
+	roles = ARRAY(SELECT DISTINCT UNNEST($1 :: text[]))
+WHERE
+		user_id = $2
+		AND organization_id = $3
+RETURNING user_id, organization_id, created_at, updated_at, roles
+`
+
+type UpdateMemberRolesParams struct {
+	GrantedRoles []string  `db:"granted_roles" json:"granted_roles"`
+	UserID       uuid.UUID `db:"user_id" json:"user_id"`
+	OrgID        uuid.UUID `db:"org_id" json:"org_id"`
+}
+
+func (q *sqlQuerier) UpdateMemberRoles(ctx context.Context, arg UpdateMemberRolesParams) (OrganizationMember, error) {
+	row := q.db.QueryRowContext(ctx, updateMemberRoles, pq.Array(arg.GrantedRoles), arg.UserID, arg.OrgID)
 	var i OrganizationMember
 	err := row.Scan(
 		&i.UserID,
@@ -451,6 +528,42 @@ func (q *sqlQuerier) GetOrganizationByName(ctx context.Context, name string) (Or
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getOrganizations = `-- name: GetOrganizations :many
+SELECT
+	id, name, description, created_at, updated_at
+FROM
+	organizations
+`
+
+func (q *sqlQuerier) GetOrganizations(ctx context.Context) ([]Organization, error) {
+	rows, err := q.db.QueryContext(ctx, getOrganizations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Organization
+	for rows.Next() {
+		var i Organization
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getOrganizationsByUserID = `-- name: GetOrganizationsByUserID :many
@@ -1777,7 +1890,7 @@ func (q *sqlQuerier) UpdateTemplateVersionByID(ctx context.Context, arg UpdateTe
 
 const getUserByEmailOrUsername = `-- name: GetUserByEmailOrUsername :one
 SELECT
-	id, email, name, revoked, login_type, hashed_password, created_at, updated_at, username
+	id, email, username, hashed_password, created_at, updated_at, status, rbac_roles
 FROM
 	users
 WHERE
@@ -1798,20 +1911,19 @@ func (q *sqlQuerier) GetUserByEmailOrUsername(ctx context.Context, arg GetUserBy
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
-		&i.Name,
-		&i.Revoked,
-		&i.LoginType,
+		&i.Username,
 		&i.HashedPassword,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Username,
+		&i.Status,
+		pq.Array(&i.RBACRoles),
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
 SELECT
-	id, email, name, revoked, login_type, hashed_password, created_at, updated_at, username
+	id, email, username, hashed_password, created_at, updated_at, status, rbac_roles
 FROM
 	users
 WHERE
@@ -1826,13 +1938,12 @@ func (q *sqlQuerier) GetUserByID(ctx context.Context, id uuid.UUID) (User, error
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
-		&i.Name,
-		&i.Revoked,
-		&i.LoginType,
+		&i.Username,
 		&i.HashedPassword,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Username,
+		&i.Status,
+		pq.Array(&i.RBACRoles),
 	)
 	return i, err
 }
@@ -1853,7 +1964,7 @@ func (q *sqlQuerier) GetUserCount(ctx context.Context) (int64, error) {
 
 const getUsers = `-- name: GetUsers :many
 SELECT
-	id, email, name, revoked, login_type, hashed_password, created_at, updated_at, username
+	id, email, username, hashed_password, created_at, updated_at, status, rbac_roles
 FROM
 	users
 WHERE
@@ -1879,26 +1990,38 @@ WHERE
 			)
 			ELSE true
 	END
+	-- Start filters
+	-- Filter by name, email or username
 	AND CASE
 		WHEN $2 :: text != '' THEN (
 			email LIKE concat('%', $2, '%')
 			OR username LIKE concat('%', $2, '%')
-			OR 'name' LIKE concat('%', $2, '%')
+		)	
+		ELSE true
+	END
+	-- Filter by status
+	AND CASE
+		-- @status needs to be a text because it can be empty, If it was
+		-- user_status enum, it would not.
+		WHEN $3 :: text != '' THEN (
+			status = $3 :: user_status
 		)
 		ELSE true
 	END
+	-- End of filters
 ORDER BY
     -- Deterministic and consistent ordering of all users, even if they share
     -- a timestamp. This is to ensure consistent pagination.
-	(created_at, id) ASC OFFSET $3
+	(created_at, id) ASC OFFSET $4
 LIMIT
 	-- A null limit means "no limit", so -1 means return all
-	NULLIF($4 :: int, -1)
+	NULLIF($5 :: int, -1)
 `
 
 type GetUsersParams struct {
 	AfterUser uuid.UUID `db:"after_user" json:"after_user"`
 	Search    string    `db:"search" json:"search"`
+	Status    string    `db:"status" json:"status"`
 	OffsetOpt int32     `db:"offset_opt" json:"offset_opt"`
 	LimitOpt  int32     `db:"limit_opt" json:"limit_opt"`
 }
@@ -1907,6 +2030,7 @@ func (q *sqlQuerier) GetUsers(ctx context.Context, arg GetUsersParams) ([]User, 
 	rows, err := q.db.QueryContext(ctx, getUsers,
 		arg.AfterUser,
 		arg.Search,
+		arg.Status,
 		arg.OffsetOpt,
 		arg.LimitOpt,
 	)
@@ -1920,13 +2044,12 @@ func (q *sqlQuerier) GetUsers(ctx context.Context, arg GetUsersParams) ([]User, 
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
-			&i.Name,
-			&i.Revoked,
-			&i.LoginType,
+			&i.Username,
 			&i.HashedPassword,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.Username,
+			&i.Status,
+			pq.Array(&i.RBACRoles),
 		); err != nil {
 			return nil, err
 		}
@@ -1946,51 +2069,46 @@ INSERT INTO
 	users (
 		id,
 		email,
-		"name",
-		login_type,
-		revoked,
+		username,
 		hashed_password,
 		created_at,
 		updated_at,
-		username
+		rbac_roles
 	)
 VALUES
-	($1, $2, $3, $4, FALSE, $5, $6, $7, $8) RETURNING id, email, name, revoked, login_type, hashed_password, created_at, updated_at, username
+	($1, $2, $3, $4, $5, $6, $7) RETURNING id, email, username, hashed_password, created_at, updated_at, status, rbac_roles
 `
 
 type InsertUserParams struct {
 	ID             uuid.UUID `db:"id" json:"id"`
 	Email          string    `db:"email" json:"email"`
-	Name           string    `db:"name" json:"name"`
-	LoginType      LoginType `db:"login_type" json:"login_type"`
+	Username       string    `db:"username" json:"username"`
 	HashedPassword []byte    `db:"hashed_password" json:"hashed_password"`
 	CreatedAt      time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt      time.Time `db:"updated_at" json:"updated_at"`
-	Username       string    `db:"username" json:"username"`
+	RBACRoles      []string  `db:"rbac_roles" json:"rbac_roles"`
 }
 
 func (q *sqlQuerier) InsertUser(ctx context.Context, arg InsertUserParams) (User, error) {
 	row := q.db.QueryRowContext(ctx, insertUser,
 		arg.ID,
 		arg.Email,
-		arg.Name,
-		arg.LoginType,
+		arg.Username,
 		arg.HashedPassword,
 		arg.CreatedAt,
 		arg.UpdatedAt,
-		arg.Username,
+		pq.Array(arg.RBACRoles),
 	)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
-		&i.Name,
-		&i.Revoked,
-		&i.LoginType,
+		&i.Username,
 		&i.HashedPassword,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Username,
+		&i.Status,
+		pq.Array(&i.RBACRoles),
 	)
 	return i, err
 }
@@ -2000,17 +2118,15 @@ UPDATE
 	users
 SET
 	email = $2,
-	"name" = $3,
-	username = $4,
-	updated_at = $5
+	username = $3,
+	updated_at = $4
 WHERE
-	id = $1 RETURNING id, email, name, revoked, login_type, hashed_password, created_at, updated_at, username
+	id = $1 RETURNING id, email, username, hashed_password, created_at, updated_at, status, rbac_roles
 `
 
 type UpdateUserProfileParams struct {
 	ID        uuid.UUID `db:"id" json:"id"`
 	Email     string    `db:"email" json:"email"`
-	Name      string    `db:"name" json:"name"`
 	Username  string    `db:"username" json:"username"`
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
@@ -2019,7 +2135,6 @@ func (q *sqlQuerier) UpdateUserProfile(ctx context.Context, arg UpdateUserProfil
 	row := q.db.QueryRowContext(ctx, updateUserProfile,
 		arg.ID,
 		arg.Email,
-		arg.Name,
 		arg.Username,
 		arg.UpdatedAt,
 	)
@@ -2027,13 +2142,76 @@ func (q *sqlQuerier) UpdateUserProfile(ctx context.Context, arg UpdateUserProfil
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
-		&i.Name,
-		&i.Revoked,
-		&i.LoginType,
+		&i.Username,
 		&i.HashedPassword,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Status,
+		pq.Array(&i.RBACRoles),
+	)
+	return i, err
+}
+
+const updateUserRoles = `-- name: UpdateUserRoles :one
+UPDATE
+    users
+SET
+	-- Remove all duplicates from the roles.
+	rbac_roles = ARRAY(SELECT DISTINCT UNNEST($1 :: text[]))
+WHERE
+ 	id = $2
+RETURNING id, email, username, hashed_password, created_at, updated_at, status, rbac_roles
+`
+
+type UpdateUserRolesParams struct {
+	GrantedRoles []string  `db:"granted_roles" json:"granted_roles"`
+	ID           uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *sqlQuerier) UpdateUserRoles(ctx context.Context, arg UpdateUserRolesParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUserRoles, pq.Array(arg.GrantedRoles), arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
 		&i.Username,
+		&i.HashedPassword,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Status,
+		pq.Array(&i.RBACRoles),
+	)
+	return i, err
+}
+
+const updateUserStatus = `-- name: UpdateUserStatus :one
+UPDATE
+	users
+SET
+	status = $2,
+	updated_at = $3
+WHERE
+	id = $1 RETURNING id, email, username, hashed_password, created_at, updated_at, status, rbac_roles
+`
+
+type UpdateUserStatusParams struct {
+	ID        uuid.UUID  `db:"id" json:"id"`
+	Status    UserStatus `db:"status" json:"status"`
+	UpdatedAt time.Time  `db:"updated_at" json:"updated_at"`
+}
+
+func (q *sqlQuerier) UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUserStatus, arg.ID, arg.Status, arg.UpdatedAt)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Username,
+		&i.HashedPassword,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Status,
+		pq.Array(&i.RBACRoles),
 	)
 	return i, err
 }
@@ -2707,7 +2885,7 @@ func (q *sqlQuerier) InsertWorkspaceResource(ctx context.Context, arg InsertWork
 
 const getWorkspaceByID = `-- name: GetWorkspaceByID :one
 SELECT
-	id, created_at, updated_at, owner_id, template_id, deleted, name, autostart_schedule, autostop_schedule
+	id, created_at, updated_at, owner_id, organization_id, template_id, deleted, name, autostart_schedule, autostop_schedule
 FROM
 	workspaces
 WHERE
@@ -2724,6 +2902,7 @@ func (q *sqlQuerier) GetWorkspaceByID(ctx context.Context, id uuid.UUID) (Worksp
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.OwnerID,
+		&i.OrganizationID,
 		&i.TemplateID,
 		&i.Deleted,
 		&i.Name,
@@ -2733,9 +2912,9 @@ func (q *sqlQuerier) GetWorkspaceByID(ctx context.Context, id uuid.UUID) (Worksp
 	return i, err
 }
 
-const getWorkspaceByUserIDAndName = `-- name: GetWorkspaceByUserIDAndName :one
+const getWorkspaceByOwnerIDAndName = `-- name: GetWorkspaceByOwnerIDAndName :one
 SELECT
-	id, created_at, updated_at, owner_id, template_id, deleted, name, autostart_schedule, autostop_schedule
+	id, created_at, updated_at, owner_id, organization_id, template_id, deleted, name, autostart_schedule, autostop_schedule
 FROM
 	workspaces
 WHERE
@@ -2744,20 +2923,21 @@ WHERE
 	AND LOWER("name") = LOWER($3)
 `
 
-type GetWorkspaceByUserIDAndNameParams struct {
+type GetWorkspaceByOwnerIDAndNameParams struct {
 	OwnerID uuid.UUID `db:"owner_id" json:"owner_id"`
 	Deleted bool      `db:"deleted" json:"deleted"`
 	Name    string    `db:"name" json:"name"`
 }
 
-func (q *sqlQuerier) GetWorkspaceByUserIDAndName(ctx context.Context, arg GetWorkspaceByUserIDAndNameParams) (Workspace, error) {
-	row := q.db.QueryRowContext(ctx, getWorkspaceByUserIDAndName, arg.OwnerID, arg.Deleted, arg.Name)
+func (q *sqlQuerier) GetWorkspaceByOwnerIDAndName(ctx context.Context, arg GetWorkspaceByOwnerIDAndNameParams) (Workspace, error) {
+	row := q.db.QueryRowContext(ctx, getWorkspaceByOwnerIDAndName, arg.OwnerID, arg.Deleted, arg.Name)
 	var i Workspace
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.OwnerID,
+		&i.OrganizationID,
 		&i.TemplateID,
 		&i.Deleted,
 		&i.Name,
@@ -2808,9 +2988,101 @@ func (q *sqlQuerier) GetWorkspaceOwnerCountsByTemplateIDs(ctx context.Context, i
 	return items, nil
 }
 
+const getWorkspacesByOrganizationID = `-- name: GetWorkspacesByOrganizationID :many
+SELECT id, created_at, updated_at, owner_id, organization_id, template_id, deleted, name, autostart_schedule, autostop_schedule FROM workspaces WHERE organization_id = $1 AND deleted = $2
+`
+
+type GetWorkspacesByOrganizationIDParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	Deleted        bool      `db:"deleted" json:"deleted"`
+}
+
+func (q *sqlQuerier) GetWorkspacesByOrganizationID(ctx context.Context, arg GetWorkspacesByOrganizationIDParams) ([]Workspace, error) {
+	rows, err := q.db.QueryContext(ctx, getWorkspacesByOrganizationID, arg.OrganizationID, arg.Deleted)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Workspace
+	for rows.Next() {
+		var i Workspace
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.OwnerID,
+			&i.OrganizationID,
+			&i.TemplateID,
+			&i.Deleted,
+			&i.Name,
+			&i.AutostartSchedule,
+			&i.AutostopSchedule,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getWorkspacesByOwnerID = `-- name: GetWorkspacesByOwnerID :many
+SELECT
+	id, created_at, updated_at, owner_id, organization_id, template_id, deleted, name, autostart_schedule, autostop_schedule
+FROM
+	workspaces
+WHERE
+	owner_id = $1
+	AND deleted = $2
+`
+
+type GetWorkspacesByOwnerIDParams struct {
+	OwnerID uuid.UUID `db:"owner_id" json:"owner_id"`
+	Deleted bool      `db:"deleted" json:"deleted"`
+}
+
+func (q *sqlQuerier) GetWorkspacesByOwnerID(ctx context.Context, arg GetWorkspacesByOwnerIDParams) ([]Workspace, error) {
+	rows, err := q.db.QueryContext(ctx, getWorkspacesByOwnerID, arg.OwnerID, arg.Deleted)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Workspace
+	for rows.Next() {
+		var i Workspace
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.OwnerID,
+			&i.OrganizationID,
+			&i.TemplateID,
+			&i.Deleted,
+			&i.Name,
+			&i.AutostartSchedule,
+			&i.AutostopSchedule,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getWorkspacesByTemplateID = `-- name: GetWorkspacesByTemplateID :many
 SELECT
-	id, created_at, updated_at, owner_id, template_id, deleted, name, autostart_schedule, autostop_schedule
+	id, created_at, updated_at, owner_id, organization_id, template_id, deleted, name, autostart_schedule, autostop_schedule
 FROM
 	workspaces
 WHERE
@@ -2837,54 +3109,7 @@ func (q *sqlQuerier) GetWorkspacesByTemplateID(ctx context.Context, arg GetWorks
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.OwnerID,
-			&i.TemplateID,
-			&i.Deleted,
-			&i.Name,
-			&i.AutostartSchedule,
-			&i.AutostopSchedule,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getWorkspacesByUserID = `-- name: GetWorkspacesByUserID :many
-SELECT
-	id, created_at, updated_at, owner_id, template_id, deleted, name, autostart_schedule, autostop_schedule
-FROM
-	workspaces
-WHERE
-	owner_id = $1
-	AND deleted = $2
-`
-
-type GetWorkspacesByUserIDParams struct {
-	OwnerID uuid.UUID `db:"owner_id" json:"owner_id"`
-	Deleted bool      `db:"deleted" json:"deleted"`
-}
-
-func (q *sqlQuerier) GetWorkspacesByUserID(ctx context.Context, arg GetWorkspacesByUserIDParams) ([]Workspace, error) {
-	rows, err := q.db.QueryContext(ctx, getWorkspacesByUserID, arg.OwnerID, arg.Deleted)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Workspace
-	for rows.Next() {
-		var i Workspace
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.OwnerID,
+			&i.OrganizationID,
 			&i.TemplateID,
 			&i.Deleted,
 			&i.Name,
@@ -2911,20 +3136,22 @@ INSERT INTO
 		created_at,
 		updated_at,
 		owner_id,
+		organization_id,
 		template_id,
 		name
 	)
 VALUES
-	($1, $2, $3, $4, $5, $6) RETURNING id, created_at, updated_at, owner_id, template_id, deleted, name, autostart_schedule, autostop_schedule
+	($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at, updated_at, owner_id, organization_id, template_id, deleted, name, autostart_schedule, autostop_schedule
 `
 
 type InsertWorkspaceParams struct {
-	ID         uuid.UUID `db:"id" json:"id"`
-	CreatedAt  time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt  time.Time `db:"updated_at" json:"updated_at"`
-	OwnerID    uuid.UUID `db:"owner_id" json:"owner_id"`
-	TemplateID uuid.UUID `db:"template_id" json:"template_id"`
-	Name       string    `db:"name" json:"name"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	CreatedAt      time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt      time.Time `db:"updated_at" json:"updated_at"`
+	OwnerID        uuid.UUID `db:"owner_id" json:"owner_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	TemplateID     uuid.UUID `db:"template_id" json:"template_id"`
+	Name           string    `db:"name" json:"name"`
 }
 
 func (q *sqlQuerier) InsertWorkspace(ctx context.Context, arg InsertWorkspaceParams) (Workspace, error) {
@@ -2933,6 +3160,7 @@ func (q *sqlQuerier) InsertWorkspace(ctx context.Context, arg InsertWorkspacePar
 		arg.CreatedAt,
 		arg.UpdatedAt,
 		arg.OwnerID,
+		arg.OrganizationID,
 		arg.TemplateID,
 		arg.Name,
 	)
@@ -2942,6 +3170,7 @@ func (q *sqlQuerier) InsertWorkspace(ctx context.Context, arg InsertWorkspacePar
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.OwnerID,
+		&i.OrganizationID,
 		&i.TemplateID,
 		&i.Deleted,
 		&i.Name,

@@ -120,8 +120,14 @@ func workspaceAgent() *cobra.Command {
 			if err != nil {
 				return xerrors.Errorf("writing agent session token to config: %w", err)
 			}
+			err = cfg.URL().Write(client.URL.String())
+			if err != nil {
+				return xerrors.Errorf("writing agent url to config: %w", err)
+			}
 
-			closer := agent.New(client.ListenWorkspaceAgent, logger)
+			closer := agent.New(client.ListenWorkspaceAgent, &agent.Options{
+				Logger: logger,
+			})
 			<-cmd.Context().Done()
 			return closer.Close()
 		},

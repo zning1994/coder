@@ -207,11 +207,19 @@ func (q *fakeQuerier) GetUsers(_ context.Context, params database.GetUsersParams
 				tmp = append(tmp, users[i])
 			} else if strings.Contains(user.Username, params.Search) {
 				tmp = append(tmp, users[i])
-			} else if strings.Contains(user.Name, params.Search) {
-				tmp = append(tmp, users[i])
 			}
 		}
 		users = tmp
+	}
+
+	if params.Status != "" {
+		usersFilteredByStatus := make([]database.User, 0, len(users))
+		for i, user := range users {
+			if params.Status == string(user.Status) {
+				usersFilteredByStatus = append(usersFilteredByStatus, users[i])
+			}
+		}
+		users = usersFilteredByStatus
 	}
 
 	if params.OffsetOpt > 0 {
@@ -227,6 +235,7 @@ func (q *fakeQuerier) GetUsers(_ context.Context, params database.GetUsersParams
 		}
 		users = users[:params.LimitOpt]
 	}
+
 	tmp := make([]database.User, len(users))
 	copy(tmp, users)
 
@@ -265,7 +274,7 @@ func (q *fakeQuerier) GetWorkspaceByID(_ context.Context, id uuid.UUID) (databas
 	return database.Workspace{}, sql.ErrNoRows
 }
 
-func (q *fakeQuerier) GetWorkspaceByUserIDAndName(_ context.Context, arg database.GetWorkspaceByUserIDAndNameParams) (database.Workspace, error) {
+func (q *fakeQuerier) GetWorkspaceByOwnerIDAndName(_ context.Context, arg database.GetWorkspaceByOwnerIDAndNameParams) (database.Workspace, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
@@ -414,7 +423,27 @@ func (q *fakeQuerier) GetWorkspaceBuildByWorkspaceIDAndName(_ context.Context, a
 	return database.WorkspaceBuild{}, sql.ErrNoRows
 }
 
-func (q *fakeQuerier) GetWorkspacesByUserID(_ context.Context, req database.GetWorkspacesByUserIDParams) ([]database.Workspace, error) {
+func (q *fakeQuerier) GetWorkspacesByOrganizationID(_ context.Context, req database.GetWorkspacesByOrganizationIDParams) ([]database.Workspace, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	workspaces := make([]database.Workspace, 0)
+	for _, workspace := range q.workspaces {
+		if workspace.OrganizationID != req.OrganizationID {
+			continue
+		}
+		if workspace.Deleted != req.Deleted {
+			continue
+		}
+		workspaces = append(workspaces, workspace)
+	}
+	if len(workspaces) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return workspaces, nil
+}
+
+func (q *fakeQuerier) GetWorkspacesByOwnerID(_ context.Context, req database.GetWorkspacesByOwnerIDParams) ([]database.Workspace, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
@@ -432,6 +461,16 @@ func (q *fakeQuerier) GetWorkspacesByUserID(_ context.Context, req database.GetW
 		return nil, sql.ErrNoRows
 	}
 	return workspaces, nil
+}
+
+func (q *fakeQuerier) GetOrganizations(_ context.Context) ([]database.Organization, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	if len(q.organizations) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return q.organizations, nil
 }
 
 func (q *fakeQuerier) GetOrganizationByID(_ context.Context, id uuid.UUID) (database.Organization, error) {
@@ -681,6 +720,66 @@ func (q *fakeQuerier) GetOrganizationMemberByUserID(_ context.Context, arg datab
 	return database.OrganizationMember{}, sql.ErrNoRows
 }
 
+func (q *fakeQuerier) GetOrganizationIDsByMemberIDs(_ context.Context, ids []uuid.UUID) ([]database.GetOrganizationIDsByMemberIDsRow, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	getOrganizationIDsByMemberIDRows := make([]database.GetOrganizationIDsByMemberIDsRow, 0, len(ids))
+	for _, userID := range ids {
+		userOrganizationIDs := make([]uuid.UUID, 0)
+		for _, membership := range q.organizationMembers {
+			if membership.UserID == userID {
+				userOrganizationIDs = append(userOrganizationIDs, membership.OrganizationID)
+			}
+		}
+		getOrganizationIDsByMemberIDRows = append(getOrganizationIDsByMemberIDRows, database.GetOrganizationIDsByMemberIDsRow{
+			UserID:          userID,
+			OrganizationIDs: userOrganizationIDs,
+		})
+	}
+	if len(getOrganizationIDsByMemberIDRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return getOrganizationIDsByMemberIDRows, nil
+}
+
+func (q *fakeQuerier) GetOrganizationMembershipsByUserID(_ context.Context, userID uuid.UUID) ([]database.OrganizationMember, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	var memberships []database.OrganizationMember
+	for _, organizationMember := range q.organizationMembers {
+		mem := organizationMember
+		if mem.UserID != userID {
+			continue
+		}
+		memberships = append(memberships, mem)
+	}
+	return memberships, nil
+}
+
+func (q *fakeQuerier) UpdateMemberRoles(_ context.Context, arg database.UpdateMemberRolesParams) (database.OrganizationMember, error) {
+	for i, mem := range q.organizationMembers {
+		if mem.UserID == arg.UserID && mem.OrganizationID == arg.OrgID {
+			uniqueRoles := make([]string, 0, len(arg.GrantedRoles))
+			exist := make(map[string]struct{})
+			for _, r := range arg.GrantedRoles {
+				if _, ok := exist[r]; ok {
+					continue
+				}
+				exist[r] = struct{}{}
+				uniqueRoles = append(uniqueRoles, r)
+			}
+			sort.Strings(uniqueRoles)
+
+			mem.Roles = uniqueRoles
+			q.organizationMembers[i] = mem
+			return mem, nil
+		}
+	}
+	return database.OrganizationMember{}, sql.ErrNoRows
+}
+
 func (q *fakeQuerier) GetProvisionerDaemons(_ context.Context) ([]database.ProvisionerDaemon, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
@@ -856,21 +955,18 @@ func (q *fakeQuerier) InsertAPIKey(_ context.Context, arg database.InsertAPIKeyP
 
 	//nolint:gosimple
 	key := database.APIKey{
-		ID:               arg.ID,
-		HashedSecret:     arg.HashedSecret,
-		UserID:           arg.UserID,
-		Application:      arg.Application,
-		Name:             arg.Name,
-		LastUsed:         arg.LastUsed,
-		ExpiresAt:        arg.ExpiresAt,
-		CreatedAt:        arg.CreatedAt,
-		UpdatedAt:        arg.UpdatedAt,
-		LoginType:        arg.LoginType,
-		OIDCAccessToken:  arg.OIDCAccessToken,
-		OIDCRefreshToken: arg.OIDCRefreshToken,
-		OIDCIDToken:      arg.OIDCIDToken,
-		OIDCExpiry:       arg.OIDCExpiry,
-		DevurlToken:      arg.DevurlToken,
+		ID:                arg.ID,
+		HashedSecret:      arg.HashedSecret,
+		UserID:            arg.UserID,
+		ExpiresAt:         arg.ExpiresAt,
+		CreatedAt:         arg.CreatedAt,
+		UpdatedAt:         arg.UpdatedAt,
+		LastUsed:          arg.LastUsed,
+		LoginType:         arg.LoginType,
+		OAuthAccessToken:  arg.OAuthAccessToken,
+		OAuthRefreshToken: arg.OAuthRefreshToken,
+		OAuthIDToken:      arg.OAuthIDToken,
+		OAuthExpiry:       arg.OAuthExpiry,
 	}
 	q.apiKeys = append(q.apiKeys, key)
 	return key, nil
@@ -1109,15 +1205,45 @@ func (q *fakeQuerier) InsertUser(_ context.Context, arg database.InsertUserParam
 	user := database.User{
 		ID:             arg.ID,
 		Email:          arg.Email,
-		Name:           arg.Name,
-		LoginType:      arg.LoginType,
 		HashedPassword: arg.HashedPassword,
 		CreatedAt:      arg.CreatedAt,
 		UpdatedAt:      arg.UpdatedAt,
 		Username:       arg.Username,
+		Status:         database.UserStatusActive,
+		RBACRoles:      arg.RBACRoles,
 	}
 	q.users = append(q.users, user)
 	return user, nil
+}
+
+func (q *fakeQuerier) UpdateUserRoles(_ context.Context, arg database.UpdateUserRolesParams) (database.User, error) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	for index, user := range q.users {
+		if user.ID != arg.ID {
+			continue
+		}
+
+		// Set new roles
+		user.RBACRoles = arg.GrantedRoles
+		// Remove duplicates and sort
+		uniqueRoles := make([]string, 0, len(user.RBACRoles))
+		exist := make(map[string]struct{})
+		for _, r := range user.RBACRoles {
+			if _, ok := exist[r]; ok {
+				continue
+			}
+			exist[r] = struct{}{}
+			uniqueRoles = append(uniqueRoles, r)
+		}
+		sort.Strings(uniqueRoles)
+		user.RBACRoles = uniqueRoles
+
+		q.users[index] = user
+		return user, nil
+	}
+	return database.User{}, sql.ErrNoRows
 }
 
 func (q *fakeQuerier) UpdateUserProfile(_ context.Context, arg database.UpdateUserProfileParams) (database.User, error) {
@@ -1128,9 +1254,24 @@ func (q *fakeQuerier) UpdateUserProfile(_ context.Context, arg database.UpdateUs
 		if user.ID != arg.ID {
 			continue
 		}
-		user.Name = arg.Name
 		user.Email = arg.Email
 		user.Username = arg.Username
+		q.users[index] = user
+		return user, nil
+	}
+	return database.User{}, sql.ErrNoRows
+}
+
+func (q *fakeQuerier) UpdateUserStatus(_ context.Context, arg database.UpdateUserStatusParams) (database.User, error) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	for index, user := range q.users {
+		if user.ID != arg.ID {
+			continue
+		}
+		user.Status = arg.Status
+		user.UpdatedAt = arg.UpdatedAt
 		q.users[index] = user
 		return user, nil
 	}
@@ -1143,12 +1284,13 @@ func (q *fakeQuerier) InsertWorkspace(_ context.Context, arg database.InsertWork
 
 	//nolint:gosimple
 	workspace := database.Workspace{
-		ID:         arg.ID,
-		CreatedAt:  arg.CreatedAt,
-		UpdatedAt:  arg.UpdatedAt,
-		OwnerID:    arg.OwnerID,
-		TemplateID: arg.TemplateID,
-		Name:       arg.Name,
+		ID:             arg.ID,
+		CreatedAt:      arg.CreatedAt,
+		UpdatedAt:      arg.UpdatedAt,
+		OwnerID:        arg.OwnerID,
+		OrganizationID: arg.OrganizationID,
+		TemplateID:     arg.TemplateID,
+		Name:           arg.Name,
 	}
 	q.workspaces = append(q.workspaces, workspace)
 	return workspace, nil
@@ -1185,9 +1327,9 @@ func (q *fakeQuerier) UpdateAPIKeyByID(_ context.Context, arg database.UpdateAPI
 		}
 		apiKey.LastUsed = arg.LastUsed
 		apiKey.ExpiresAt = arg.ExpiresAt
-		apiKey.OIDCAccessToken = arg.OIDCAccessToken
-		apiKey.OIDCRefreshToken = arg.OIDCRefreshToken
-		apiKey.OIDCExpiry = arg.OIDCExpiry
+		apiKey.OAuthAccessToken = arg.OAuthAccessToken
+		apiKey.OAuthRefreshToken = arg.OAuthRefreshToken
+		apiKey.OAuthExpiry = arg.OAuthExpiry
 		q.apiKeys[index] = apiKey
 		return nil
 	}

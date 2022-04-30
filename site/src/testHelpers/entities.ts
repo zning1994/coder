@@ -1,14 +1,16 @@
 import {
   BuildInfoResponse,
   Organization,
-  Pager,
   Provisioner,
   Template,
   UserAgent,
   UserResponse,
   Workspace,
+  WorkspaceAgent,
   WorkspaceAutostartRequest,
+  WorkspaceResource,
 } from "../api/types"
+import { AuthMethods } from "../api/typesGenerated"
 
 export const MockSessionToken = { session_token: "my-session-token" }
 
@@ -20,23 +22,21 @@ export const MockBuildInfo: BuildInfoResponse = {
 }
 
 export const MockUser: UserResponse = {
-  name: "Test User",
   id: "test-user",
   username: "TestUser",
   email: "test@coder.com",
   created_at: "",
+  status: "active",
+  organization_ids: ["fc0774ce-cc9e-48d4-80ae-88f7a4d4a8b0"],
 }
 
 export const MockUser2: UserResponse = {
   id: "test-user-2",
-  name: "Test User 2",
   username: "TestUser2",
   email: "test2@coder.com",
   created_at: "",
-}
-
-export const MockPager: Pager = {
-  total: 2,
+  status: "active",
+  organization_ids: ["fc0774ce-cc9e-48d4-80ae-88f7a4d4a8b0"],
 }
 
 export const MockOrganization: Organization = {
@@ -89,6 +89,20 @@ export const MockWorkspace: Workspace = {
   owner_id: MockUser.id,
   autostart_schedule: MockWorkspaceAutostartEnabled.schedule,
   autostop_schedule: MockWorkspaceAutostopEnabled.schedule,
+  latest_build: {
+    id: "test-workspace-build",
+  },
+}
+
+export const MockWorkspaceAgent: WorkspaceAgent = {
+  id: "test-workspace-agent",
+  name: "a-workspace-agent",
+  operating_system: "linux",
+}
+
+export const MockWorkspaceResource: WorkspaceResource = {
+  id: "test-workspace-resource",
+  agents: [MockWorkspaceAgent],
 }
 
 export const MockUserAgent: UserAgent = {
@@ -96,4 +110,9 @@ export const MockUserAgent: UserAgent = {
   device: "Other",
   ip_address: "11.22.33.44",
   os: "Windows 10",
+}
+
+export const MockAuthMethods: AuthMethods = {
+  password: true,
+  github: false,
 }

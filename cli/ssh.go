@@ -33,9 +33,13 @@ func ssh() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			organization, err := currentOrganization(cmd, client)
+			if err != nil {
+				return err
+			}
 
 			workspaceParts := strings.Split(args[0], ".")
-			workspace, err := client.WorkspaceByName(cmd.Context(), codersdk.Me, workspaceParts[0])
+			workspace, err := client.WorkspaceByOwnerAndName(cmd.Context(), organization.ID, codersdk.Me, workspaceParts[0])
 			if err != nil {
 				return err
 			}
@@ -133,6 +137,19 @@ func ssh() *cobra.Command {
 				}
 				defer func() {
 					_ = term.Restore(int(os.Stdin.Fd()), state)
+				}()
+
+				windowChange := listenWindowSize(cmd.Context())
+				go func() {
+					for {
+						select {
+						case <-cmd.Context().Done():
+							return
+						case <-windowChange:
+						}
+						width, height, _ := term.GetSize(int(stdoutFile.Fd()))
+						_ = sshSession.WindowChange(height, width)
+					}
 				}()
 			}
 

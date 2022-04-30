@@ -23,9 +23,13 @@ func vscode() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			organization, err := currentOrganization(cmd, client)
+			if err != nil {
+				return err
+			}
 
 			workspaceParts := strings.Split(args[0], ".")
-			workspace, err := client.WorkspaceByName(cmd.Context(), codersdk.Me, workspaceParts[0])
+			workspace, err := client.WorkspaceByOwnerAndName(cmd.Context(), organization.ID, codersdk.Me, workspaceParts[0])
 			if err != nil {
 				return err
 			}
