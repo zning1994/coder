@@ -137,6 +137,7 @@ func server() *cobra.Command {
 
 			// If we're attempting to tunnel in dev-mode, the access URL
 			// needs to be changed to use the tunnel.
+			gracefulShutdownDevTunnel :=  func(_ io.Writer) error {return nil}
 			if dev && !skipTunnel {
 				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), cliui.Styles.Wrap.Render(
 					"Coder requires a URL accessible by workspaces you provision. "+
@@ -159,6 +160,13 @@ func server() *cobra.Command {
 					}
 				}
 				_, _ = fmt.Fprintln(cmd.ErrOrStderr())
+
+				gracefulShutdownDevTunnel = func(out io.Writer) error {
+					_, _ = fmt.Fprintf(out, cliui.Styles.Prompt.String()+"Waiting for dev tunnel to close...\n")
+					closeTunnel()
+					<-tunnelErrChan
+					return nil
+				}
 			}
 
 			validator, err := idtoken.NewValidator(cmd.Context(), option.WithoutAuthentication())
@@ -259,6 +267,28 @@ func server() *cobra.Command {
 					_ = provisionerDaemon.Close()
 				}
 			}()
+			gracefulShutdownProvisionerDaemons := func(out io.Writer) error {
+
+				for _, provisionerDaemon := range provisionerDaemons {
+					spin := spinner.New(spinner.CharSets[5], 100*time.Millisecond)
+					spin.Writer = out
+					spin.Suffix = cliui.Styles.Keyword.Render(" Shutting down provisioner daemon...")
+					spin.Start()
+					err = provisionerDaemon.Shutdown(cmd.Context())
+					if err != nil {
+						spin.FinalMSG = cliui.Styles.Prompt.String() + "Failed to shutdown provisioner daemon: " + err.Error()
+						spin.Stop()
+					}
+					err = provisionerDaemon.Close()
+					if err != nil {
+						spin.Stop()
+						return xerrors.Errorf("close provisioner daemon: %w", err)
+					}
+					spin.FinalMSG = cliui.Styles.Prompt.String() + "Gracefully shut down provisioner daemon!\n"
+					spin.Stop()
+				}
+				return nil
+			}
 
 			shutdownConnsCtx, shutdownConns := context.WithCancel(cmd.Context())
 			defer shutdownConns()
@@ -275,6 +305,11 @@ func server() *cobra.Command {
 				}
 				errCh <- server.Serve(listener)
 			}()
+			gracefulShutdownConns := func(out io.Writer) error {
+				_, _ = fmt.Fprintf(out, cliui.Styles.Prompt.String()+"Waiting for WebSocket connections to close...\n")
+				shutdownConns()
+				return nil
+			}
 
 			config := createConfig(cmd)
 
@@ -319,6 +354,20 @@ func server() *cobra.Command {
 			if err != nil {
 				return xerrors.Errorf("notify systemd: %w", err)
 			}
+			notifySystemdStopping := func(_ io.Writer) error {
+				_, err := daemon.SdNotify(false, daemon.SdNotifyStopping)
+				if err != nil {
+					return xerrors.Errorf("notify systemd: %w", err)
+				}
+				return err
+			}
+
+			devDeleteWorkspaces := func(out io.Writer) error {
+				if dev {
+					return deleteMyWorkspaces(cmd.Context(), out, client)
+				}
+				return nil
+			}
 
 			stopChan := make(chan os.Signal, 1)
 			defer signal.Stop(stopChan)
@@ -336,67 +385,16 @@ func server() *cobra.Command {
 				return err
 			case <-stopChan:
 			}
-			signal.Stop(stopChan)
-			_, err = daemon.SdNotify(false, daemon.SdNotifyStopping)
-			if err != nil {
-				return xerrors.Errorf("notify systemd: %w", err)
-			}
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "\n\n"+cliui.Styles.Bold.Render("Interrupt caught. Gracefully exiting..."))
 
-			if dev {
-				organizations, err := client.OrganizationsByUser(cmd.Context(), codersdk.Me)
-				if err != nil {
-					return xerrors.Errorf("get organizations: %w", err)
-				}
-				workspaces, err := client.WorkspacesByOwner(cmd.Context(), organizations[0].ID, codersdk.Me)
-				if err != nil {
-					return xerrors.Errorf("get workspaces: %w", err)
-				}
-				for _, workspace := range workspaces {
-					before := time.Now()
-					build, err := client.CreateWorkspaceBuild(cmd.Context(), workspace.ID, codersdk.CreateWorkspaceBuildRequest{
-						Transition: database.WorkspaceTransitionDelete,
-					})
-					if err != nil {
-						return xerrors.Errorf("delete workspace: %w", err)
-					}
-
-					err = cliui.WorkspaceBuild(cmd.Context(), cmd.OutOrStdout(), client, build.ID, before)
-					if err != nil {
-						return xerrors.Errorf("delete workspace %s: %w", workspace.Name, err)
-					}
-				}
-			}
-
-			for _, provisionerDaemon := range provisionerDaemons {
-				spin := spinner.New(spinner.CharSets[5], 100*time.Millisecond)
-				spin.Writer = cmd.OutOrStdout()
-				spin.Suffix = cliui.Styles.Keyword.Render(" Shutting down provisioner daemon...")
-				spin.Start()
-				err = provisionerDaemon.Shutdown(cmd.Context())
-				if err != nil {
-					spin.FinalMSG = cliui.Styles.Prompt.String() + "Failed to shutdown provisioner daemon: " + err.Error()
-					spin.Stop()
-				}
-				err = provisionerDaemon.Close()
-				if err != nil {
-					spin.Stop()
-					return xerrors.Errorf("close provisioner daemon: %w", err)
-				}
-				spin.FinalMSG = cliui.Styles.Prompt.String() + "Gracefully shut down provisioner daemon!\n"
-				spin.Stop()
-			}
-
-			if dev && !skipTunnel {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), cliui.Styles.Prompt.String()+"Waiting for dev tunnel to close...\n")
-				closeTunnel()
-				<-tunnelErrChan
-			}
-
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), cliui.Styles.Prompt.String()+"Waiting for WebSocket connections to close...\n")
-			shutdownConns()
-			closeCoderd()
-			return nil
+			gs := newGracefulShutdown(cmd)
+			gs.procedures = []func(writer io.Writer) error {
+				notifySystemdStopping,
+				devDeleteWorkspaces,
+				gracefulShutdownProvisionerDaemons,
+				gracefulShutdownDevTunnel,
+				gracefulShutdownConns,
+				noError(closeCoderd)}
+			return gs.shutdown(stopChan)
 		},
 	}
 
@@ -446,6 +444,74 @@ func server() *cobra.Command {
 	_ = root.Flags().MarkHidden("spooky")
 
 	return root
+}
+
+// noError wraps a function that doesn't return anything into one that returns a (nil) error
+func noError(f func()) func(writer io.Writer) error {
+	return func(_ io.Writer) error {
+		f()
+		return nil
+	}
+}
+
+func interruptableGracefulShutdown(cmd *cobra.Command, stopChan <-chan os.Signal, shutdownFuncs ...func()error) error {
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "\n\n"+cliui.Styles.Bold.Render("Interrupt caught. Gracefully exiting..."))
+	done := make(chan error)
+	go func() {
+		for _, f := range shutdownFuncs {
+			if err := f(); err != nil {
+				done <- err
+			}
+		}
+		close(done)
+	}()
+
+	for {
+		select {
+		case err := <-done:
+			return err
+		case <-stopChan:
+			_, err := cliui.Prompt(cmd, cliui.PromptOptions{
+				Text: "Coder is still shutting down, if you close Coder now, your workspaces may remain up. Would you like to exit?",
+				IsConfirm: true,
+			})
+			if err != nil {
+				continue
+			}
+			os.Exit(1)
+		}
+	}
+}
+
+// deleteMyWorkspaces iterates over all the current user's workspaces and deletes them
+func deleteMyWorkspaces(ctx context.Context, out io.Writer, client *codersdk.Client) error {
+	organizations, err := client.OrganizationsByUser(ctx, codersdk.Me)
+	if err != nil {
+		return xerrors.Errorf("get organizations: %w", err)
+	}
+	workspaces, err := client.WorkspacesByOwner(ctx, organizations[0].ID, codersdk.Me)
+	if err != nil {
+		return xerrors.Errorf("get workspaces: %w", err)
+	}
+	for i:=0; i<20; i++ {
+		fmt.Fprintln(out, "sleeping 1")
+		time.Sleep(time.Second*1)
+	}
+	for _, workspace := range workspaces {
+		before := time.Now()
+		build, err := client.CreateWorkspaceBuild(ctx, workspace.ID, codersdk.CreateWorkspaceBuildRequest{
+			Transition: database.WorkspaceTransitionDelete,
+		})
+		if err != nil {
+			return xerrors.Errorf("delete workspace: %w", err)
+		}
+
+		err = cliui.WorkspaceBuild(ctx, out, client, build.ID, before)
+		if err != nil {
+			return xerrors.Errorf("delete workspace %s: %w", workspace.Name, err)
+		}
+	}
+	return nil
 }
 
 func createFirstUser(cmd *cobra.Command, client *codersdk.Client, cfg config.Root, email, password string) error {
