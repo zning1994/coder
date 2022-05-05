@@ -1,3 +1,6 @@
+-- name: GetWorkspaceResourcesByJobIDs :many
+SELECT * FROM workspace_resources WHERE job_id = ANY($1 :: uuid [ ]);
+
 -- name: GetWorkspaceResourceByID :one
 SELECT
 	*

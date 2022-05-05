@@ -30,6 +30,9 @@ WHERE
 			1
 	) RETURNING *;
 
+-- name: GetProvisionerJobsAfterCreatedAt :many
+SELECT * FROM provisioner_jobs WHERE created_at >= $1;
+
 -- name: GetProvisionerJobByID :one
 SELECT
 	*

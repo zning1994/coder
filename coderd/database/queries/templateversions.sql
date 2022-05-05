@@ -1,3 +1,6 @@
+-- name: GetTemplateVersionsAfterCreatedAt :many
+SELECT * FROM template_versions WHERE created_at > $1;
+
 -- name: GetTemplateVersionsByTemplateID :many
 SELECT
 	*

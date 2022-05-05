@@ -1,3 +1,6 @@
+-- name: GetWorkspaceBuildsWithoutAfter :many
+SELECT * FROM workspace_builds WHERE after_id IS NULL;
+
 -- name: GetWorkspaceBuildByID :one
 SELECT
 	*

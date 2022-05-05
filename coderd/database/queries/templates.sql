@@ -1,3 +1,6 @@
+-- name: GetTemplates :many
+SELECT * FROM templates WHERE deleted = $1;
+
 -- name: GetTemplateByID :one
 SELECT
 	*

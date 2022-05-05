@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/exp/slices"
@@ -263,6 +264,21 @@ func (q *fakeQuerier) GetWorkspacesByTemplateID(_ context.Context, arg database.
 		return nil, sql.ErrNoRows
 	}
 	return workspaces, nil
+}
+
+func (q *fakeQuerier) GetWorkspaceBuildsWithoutAfter(_ context.Context) ([]database.WorkspaceBuild, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+	builds := make([]database.WorkspaceBuild, 0)
+	for _, build := range q.workspaceBuilds {
+		if !build.AfterID.Valid {
+			builds = append(builds, build)
+		}
+	}
+	if len(builds) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return builds, nil
 }
 
 func (q *fakeQuerier) GetWorkspaceByID(_ context.Context, id uuid.UUID) (database.Workspace, error) {
@@ -606,6 +622,22 @@ func (q *fakeQuerier) GetTemplateVersionByTemplateIDAndName(_ context.Context, a
 	return database.TemplateVersion{}, sql.ErrNoRows
 }
 
+func (q *fakeQuerier) GetTemplateVersionsAfterCreatedAt(_ context.Context, createdAt time.Time) ([]database.TemplateVersion, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	versions := make([]database.TemplateVersion, 0)
+	for _, templateVersion := range q.templateVersions {
+		if templateVersion.CreatedAt.Equal(createdAt) || templateVersion.CreatedAt.After(createdAt) {
+			versions = append(versions, templateVersion)
+		}
+	}
+	if len(versions) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return versions, nil
+}
+
 func (q *fakeQuerier) GetTemplateVersionByID(_ context.Context, templateVersionID uuid.UUID) (database.TemplateVersion, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
@@ -681,6 +713,21 @@ func (q *fakeQuerier) GetTemplatesByOrganization(_ context.Context, arg database
 			continue
 		}
 		templates = append(templates, template)
+	}
+	if len(templates) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return templates, nil
+}
+
+func (q *fakeQuerier) GetTemplates(_ context.Context, deleted bool) ([]database.Template, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+	templates := make([]database.Template, 0)
+	for _, template := range q.templates {
+		if !template.Deleted {
+			templates = append(templates, template)
+		}
 	}
 	if len(templates) == 0 {
 		return nil, sql.ErrNoRows
@@ -909,6 +956,41 @@ func (q *fakeQuerier) GetWorkspaceResourcesByJobID(_ context.Context, jobID uuid
 	return resources, nil
 }
 
+func (q *fakeQuerier) GetWorkspaceResourcesByJobIDs(_ context.Context, ids []uuid.UUID) ([]database.WorkspaceResource, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	resources := make([]database.WorkspaceResource, 0)
+	for _, resource := range q.provisionerJobResources {
+		for _, id := range ids {
+			if id.String() == resource.ID.String() {
+				resources = append(resources, resource)
+				break
+			}
+		}
+	}
+	if len(resources) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return resources, nil
+}
+
+func (q *fakeQuerier) GetWorkspaces(_ context.Context, deleted bool) ([]database.Workspace, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	workspaces := make([]database.Workspace, 0)
+	for _, workspace := range q.workspaces {
+		if !workspace.Deleted {
+			workspaces = append(workspaces, workspace)
+		}
+	}
+	if len(workspaces) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return workspaces, nil
+}
+
 func (q *fakeQuerier) GetProvisionerJobsByIDs(_ context.Context, ids []uuid.UUID) ([]database.ProvisionerJob, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
@@ -926,6 +1008,22 @@ func (q *fakeQuerier) GetProvisionerJobsByIDs(_ context.Context, ids []uuid.UUID
 		return nil, sql.ErrNoRows
 	}
 
+	return jobs, nil
+}
+
+func (q *fakeQuerier) GetProvisionerJobsAfterCreatedAt(_ context.Context, createdAt time.Time) ([]database.ProvisionerJob, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	jobs := make([]database.ProvisionerJob, 0)
+	for _, job := range q.provisionerJobs {
+		if createdAt.Equal(job.CreatedAt) || job.CreatedAt.After(createdAt) {
+			jobs = append(jobs, job)
+		}
+	}
+	if len(jobs) == 0 {
+		return nil, sql.ErrNoRows
+	}
 	return jobs, nil
 }
 
