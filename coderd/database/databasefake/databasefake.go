@@ -963,7 +963,7 @@ func (q *fakeQuerier) GetWorkspaceResourcesByJobIDs(_ context.Context, ids []uui
 	resources := make([]database.WorkspaceResource, 0)
 	for _, resource := range q.provisionerJobResources {
 		for _, id := range ids {
-			if id.String() == resource.ID.String() {
+			if id.String() == resource.JobID.String() {
 				resources = append(resources, resource)
 				break
 			}
