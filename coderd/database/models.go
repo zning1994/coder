@@ -509,10 +509,11 @@ type WorkspaceBuild struct {
 }
 
 type WorkspaceResource struct {
-	ID         uuid.UUID           `db:"id" json:"id"`
-	CreatedAt  time.Time           `db:"created_at" json:"created_at"`
-	JobID      uuid.UUID           `db:"job_id" json:"job_id"`
-	Transition WorkspaceTransition `db:"transition" json:"transition"`
-	Type       string              `db:"type" json:"type"`
-	Name       string              `db:"name" json:"name"`
+	ID          uuid.UUID           `db:"id" json:"id"`
+	CreatedAt   time.Time           `db:"created_at" json:"created_at"`
+	JobID       uuid.UUID           `db:"job_id" json:"job_id"`
+	Transition  WorkspaceTransition `db:"transition" json:"transition"`
+	Type        string              `db:"type" json:"type"`
+	Name        string              `db:"name" json:"name"`
+	ExternalUrl sql.NullString      `db:"external_url" json:"external_url"`
 }

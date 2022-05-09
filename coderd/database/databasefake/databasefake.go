@@ -1223,12 +1223,13 @@ func (q *fakeQuerier) InsertWorkspaceResource(_ context.Context, arg database.In
 
 	//nolint:gosimple
 	resource := database.WorkspaceResource{
-		ID:         arg.ID,
-		CreatedAt:  arg.CreatedAt,
-		JobID:      arg.JobID,
-		Transition: arg.Transition,
-		Type:       arg.Type,
-		Name:       arg.Name,
+		ID:          arg.ID,
+		CreatedAt:   arg.CreatedAt,
+		JobID:       arg.JobID,
+		Transition:  arg.Transition,
+		Type:        arg.Type,
+		Name:        arg.Name,
+		ExternalUrl: arg.ExternalUrl,
 	}
 	q.provisionerJobResources = append(q.provisionerJobResources, resource)
 	return resource, nil

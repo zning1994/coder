@@ -594,6 +594,10 @@ func insertWorkspaceResource(ctx context.Context, db database.Store, jobID uuid.
 		Transition: transition,
 		Type:       protoResource.Type,
 		Name:       protoResource.Name,
+		ExternalUrl: sql.NullString{
+			String: protoResource.ExternalUrl,
+			Valid:  protoResource.ExternalUrl != "",
+		},
 	})
 	if err != nil {
 		return xerrors.Errorf("insert provisioner job resource %q: %w", protoResource.Name, err)

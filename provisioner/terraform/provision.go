@@ -510,10 +510,19 @@ func parseTerraformApply(ctx context.Context, terraform *tfexec.Terraform, state
 				}
 			}
 
+			var externalURL string
+			if strings.HasPrefix(resource.Type, "google_") {
+				externalURLRaw, valid := resource.AttributeValues["self_link"]
+				if valid {
+					externalURL, _ = externalURLRaw.(string)
+				}
+			}
+
 			resources = append(resources, &proto.Resource{
-				Name:   resource.Name,
-				Type:   resource.Type,
-				Agents: resourceAgents,
+				Name:        resource.Name,
+				Type:        resource.Type,
+				ExternalUrl: externalURL,
+				Agents:      resourceAgents,
 			})
 		}
 	}

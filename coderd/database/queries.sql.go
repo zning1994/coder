@@ -2964,7 +2964,7 @@ func (q *sqlQuerier) UpdateWorkspaceBuildByID(ctx context.Context, arg UpdateWor
 
 const getWorkspaceResourceByID = `-- name: GetWorkspaceResourceByID :one
 SELECT
-	id, created_at, job_id, transition, type, name
+	id, created_at, job_id, transition, type, name, external_url
 FROM
 	workspace_resources
 WHERE
@@ -2981,13 +2981,14 @@ func (q *sqlQuerier) GetWorkspaceResourceByID(ctx context.Context, id uuid.UUID)
 		&i.Transition,
 		&i.Type,
 		&i.Name,
+		&i.ExternalUrl,
 	)
 	return i, err
 }
 
 const getWorkspaceResourcesByJobID = `-- name: GetWorkspaceResourcesByJobID :many
 SELECT
-	id, created_at, job_id, transition, type, name
+	id, created_at, job_id, transition, type, name, external_url
 FROM
 	workspace_resources
 WHERE
@@ -3010,6 +3011,7 @@ func (q *sqlQuerier) GetWorkspaceResourcesByJobID(ctx context.Context, jobID uui
 			&i.Transition,
 			&i.Type,
 			&i.Name,
+			&i.ExternalUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -3026,18 +3028,19 @@ func (q *sqlQuerier) GetWorkspaceResourcesByJobID(ctx context.Context, jobID uui
 
 const insertWorkspaceResource = `-- name: InsertWorkspaceResource :one
 INSERT INTO
-	workspace_resources (id, created_at, job_id, transition, type, name)
+	workspace_resources (id, created_at, job_id, transition, type, name, external_url)
 VALUES
-	($1, $2, $3, $4, $5, $6) RETURNING id, created_at, job_id, transition, type, name
+	($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at, job_id, transition, type, name, external_url
 `
 
 type InsertWorkspaceResourceParams struct {
-	ID         uuid.UUID           `db:"id" json:"id"`
-	CreatedAt  time.Time           `db:"created_at" json:"created_at"`
-	JobID      uuid.UUID           `db:"job_id" json:"job_id"`
-	Transition WorkspaceTransition `db:"transition" json:"transition"`
-	Type       string              `db:"type" json:"type"`
-	Name       string              `db:"name" json:"name"`
+	ID          uuid.UUID           `db:"id" json:"id"`
+	CreatedAt   time.Time           `db:"created_at" json:"created_at"`
+	JobID       uuid.UUID           `db:"job_id" json:"job_id"`
+	Transition  WorkspaceTransition `db:"transition" json:"transition"`
+	Type        string              `db:"type" json:"type"`
+	Name        string              `db:"name" json:"name"`
+	ExternalUrl sql.NullString      `db:"external_url" json:"external_url"`
 }
 
 func (q *sqlQuerier) InsertWorkspaceResource(ctx context.Context, arg InsertWorkspaceResourceParams) (WorkspaceResource, error) {
@@ -3048,6 +3051,7 @@ func (q *sqlQuerier) InsertWorkspaceResource(ctx context.Context, arg InsertWork
 		arg.Transition,
 		arg.Type,
 		arg.Name,
+		arg.ExternalUrl,
 	)
 	var i WorkspaceResource
 	err := row.Scan(
@@ -3057,6 +3061,7 @@ func (q *sqlQuerier) InsertWorkspaceResource(ctx context.Context, arg InsertWork
 		&i.Transition,
 		&i.Type,
 		&i.Name,
+		&i.ExternalUrl,
 	)
 	return i, err
 }

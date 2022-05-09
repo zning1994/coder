@@ -90,7 +90,8 @@ message Agent {
 message Resource {
     string name = 1;
     string type = 2;
-    repeated Agent agents = 3;
+    string external_url = 3;
+    repeated Agent agents = 4;
 }
 
 // Parse consumes source-code from a directory to produce inputs.
