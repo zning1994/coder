@@ -143,7 +143,7 @@ func New(t *testing.T, options *Options) *codersdk.Client {
 // NewProvisionerDaemon launches a provisionerd instance configured to work
 // well with coderd testing. It registers the "echo" provisioner for
 // quick testing.
-func NewProvisionerDaemon(t *testing.T, client *codersdk.Client) io.Closer {
+func NewProvisionerDaemon(t *testing.T, client *codersdk.Client) (*echo.Echo, io.Closer) {
 	echoClient, echoServer := provisionersdk.TransportPipe()
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	t.Cleanup(func() {
@@ -151,10 +151,10 @@ func NewProvisionerDaemon(t *testing.T, client *codersdk.Client) io.Closer {
 		_ = echoServer.Close()
 		cancelFunc()
 	})
+	ep := &echo.Echo{}
 	go func() {
-		err := echo.Serve(ctx, &provisionersdk.ServeOptions{
-			Listener: echoServer,
-		})
+		options := &provisionersdk.ServeOptions{Listener: echoServer}
+		err := provisionersdk.Serve(ctx, ep, options)
 		require.NoError(t, err)
 	}()
 
@@ -171,7 +171,7 @@ func NewProvisionerDaemon(t *testing.T, client *codersdk.Client) io.Closer {
 	t.Cleanup(func() {
 		_ = closer.Close()
 	})
-	return closer
+	return ep, closer
 }
 
 var FirstUserParams = codersdk.CreateFirstUserRequest{

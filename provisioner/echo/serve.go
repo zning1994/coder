@@ -12,7 +12,6 @@ import (
 
 	protobuf "google.golang.org/protobuf/proto"
 
-	"github.com/coder/coder/provisionersdk"
 	"github.com/coder/coder/provisionersdk/proto"
 )
 
@@ -32,18 +31,25 @@ var (
 )
 
 // Serve starts the echo provisioner.
-func Serve(ctx context.Context, options *provisionersdk.ServeOptions) error {
-	return provisionersdk.Serve(ctx, &echo{}, options)
-}
+// func Serve(ctx context.Context, options *provisionersdk.ServeOptions) error {
+// return provisionersdk.Serve(ctx, &Echo{}, options)
+// }
 
-// The echo provisioner serves as a dummy provisioner primarily
+// The Echo provisioner serves as a dummy provisioner primarily
 // used for testing. It echos responses from JSON files in the
 // format %d.protobuf. It's used for testing.
-type echo struct {
+type Echo struct {
+	// OnParse is called when the Parse method is called, if it is not nil.
+	OnParse func(request *proto.Parse_Request)
+	// OnProvision is called when the Provision method is called, if it is not nil.
+	OnProvision func(request *proto.Provision_Request)
 }
 
 // Parse reads requests from the provided directory to stream responses.
-func (*echo) Parse(request *proto.Parse_Request, stream proto.DRPCProvisioner_ParseStream) error {
+func (e *Echo) Parse(request *proto.Parse_Request, stream proto.DRPCProvisioner_ParseStream) error {
+	if e.OnParse != nil {
+		e.OnParse(request)
+	}
 	for index := 0; ; index++ {
 		path := filepath.Join(request.Directory, fmt.Sprintf("%d.parse.protobuf", index))
 		_, err := os.Stat(path)
@@ -73,10 +79,13 @@ func (*echo) Parse(request *proto.Parse_Request, stream proto.DRPCProvisioner_Pa
 }
 
 // Provision reads requests from the provided directory to stream responses.
-func (*echo) Provision(stream proto.DRPCProvisioner_ProvisionStream) error {
+func (e *Echo) Provision(stream proto.DRPCProvisioner_ProvisionStream) error {
 	msg, err := stream.Recv()
 	if err != nil {
 		return err
+	}
+	if e.OnProvision != nil {
+		e.OnProvision(msg)
 	}
 	request := msg.GetStart()
 	for index := 0; ; index++ {
@@ -111,7 +120,7 @@ func (*echo) Provision(stream proto.DRPCProvisioner_ProvisionStream) error {
 	return stream.Context().Err()
 }
 
-func (*echo) Shutdown(_ context.Context, _ *proto.Empty) (*proto.Empty, error) {
+func (*Echo) Shutdown(_ context.Context, _ *proto.Empty) (*proto.Empty, error) {
 	return &proto.Empty{}, nil
 }
 

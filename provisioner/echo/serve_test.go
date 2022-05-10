@@ -27,10 +27,11 @@ func TestEcho(t *testing.T) {
 		_ = server.Close()
 		cancelFunc()
 	})
+	echoProvisioner := &echo.Echo{}
 	go func() {
-		err := echo.Serve(ctx, &provisionersdk.ServeOptions{
-			Listener: server,
-		})
+		options := &provisionersdk.ServeOptions{Listener: server}
+		err := provisionersdk.Serve(ctx, echoProvisioner, options)
+		require.NoError(t, err)
 		require.NoError(t, err)
 	}()
 	api := proto.NewDRPCProvisionerClient(provisionersdk.Conn(client))

@@ -24,7 +24,7 @@ func TestTemplateCreate(t *testing.T) {
 		})
 		cmd, root := clitest.New(t, "templates", "create", "my-template", "--directory", source, "--provisioner", string(database.ProvisionerTypeEcho))
 		clitest.SetupConfig(t, client, root)
-		_ = coderdtest.NewProvisionerDaemon(t, client)
+		_, _ = coderdtest.NewProvisionerDaemon(t, client)
 		doneChan := make(chan struct{})
 		pty := ptytest.New(t)
 		cmd.SetIn(pty.Input())

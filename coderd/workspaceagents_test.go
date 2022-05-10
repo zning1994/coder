@@ -27,7 +27,7 @@ func TestWorkspaceAgent(t *testing.T) {
 		t.Parallel()
 		client := coderdtest.New(t, nil)
 		user := coderdtest.CreateFirstUser(t, client)
-		daemonCloser := coderdtest.NewProvisionerDaemon(t, client)
+		_, daemonCloser := coderdtest.NewProvisionerDaemon(t, client)
 		authToken := uuid.NewString()
 		version := coderdtest.CreateTemplateVersion(t, client, user.OrganizationID, &echo.Responses{
 			Parse:           echo.ParseComplete,
@@ -68,7 +68,7 @@ func TestWorkspaceAgentListen(t *testing.T) {
 	t.Parallel()
 	client := coderdtest.New(t, nil)
 	user := coderdtest.CreateFirstUser(t, client)
-	daemonCloser := coderdtest.NewProvisionerDaemon(t, client)
+	_, daemonCloser := coderdtest.NewProvisionerDaemon(t, client)
 	authToken := uuid.NewString()
 	version := coderdtest.CreateTemplateVersion(t, client, user.OrganizationID, &echo.Responses{
 		Parse:           echo.ParseComplete,
@@ -118,7 +118,7 @@ func TestWorkspaceAgentTURN(t *testing.T) {
 	t.Parallel()
 	client := coderdtest.New(t, nil)
 	user := coderdtest.CreateFirstUser(t, client)
-	daemonCloser := coderdtest.NewProvisionerDaemon(t, client)
+	_, daemonCloser := coderdtest.NewProvisionerDaemon(t, client)
 	authToken := uuid.NewString()
 	version := coderdtest.CreateTemplateVersion(t, client, user.OrganizationID, &echo.Responses{
 		Parse:           echo.ParseComplete,
@@ -179,7 +179,7 @@ func TestWorkspaceAgentPTY(t *testing.T) {
 	}
 	client := coderdtest.New(t, nil)
 	user := coderdtest.CreateFirstUser(t, client)
-	daemonCloser := coderdtest.NewProvisionerDaemon(t, client)
+	_, daemonCloser := coderdtest.NewProvisionerDaemon(t, client)
 	authToken := uuid.NewString()
 	version := coderdtest.CreateTemplateVersion(t, client, user.OrganizationID, &echo.Responses{
 		Parse:           echo.ParseComplete,
