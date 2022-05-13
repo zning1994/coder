@@ -24,8 +24,26 @@ type PromptOptions struct {
 	Validate  func(string) error
 }
 
+// AllowSkipConfirms allows the user to pass `-y` to skip all confirm prompts for
+// the command. This is helpful for scripts.
+// The reason this is not added to the root command is that some commands mix
+// confirm prompts with regular prompts. It would be strange to skip only some
+// of the prompts.
+func AllowSkipConfirms(cmd *cobra.Command) {
+	cmd.PersistentFlags().BoolP("yes", "y", false, "Automatically yes all yes/no prompts. Other prompts will still show")
+}
+
 // Prompt asks the user for input.
 func Prompt(cmd *cobra.Command, opts PromptOptions) (string, error) {
+	if cmd.Flags().Lookup("yes") != nil {
+		// If the cmd has the skip flag available and the user has it set, return "yes"
+		// for all confirm prompts for them.
+		skipConfirms, _ := cmd.Flags().GetBool("yes")
+		if opts.IsConfirm && skipConfirms {
+			return "yes", nil
+		}
+	}
+
 	_, _ = fmt.Fprint(cmd.OutOrStdout(), Styles.FocusedPrompt.String()+opts.Text+" ")
 	if opts.IsConfirm {
 		opts.Default = "yes"
