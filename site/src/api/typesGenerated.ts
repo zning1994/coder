@@ -12,6 +12,31 @@ export interface AgentGitSSHKey {
   readonly private_key: string
 }
 
+// From codersdk/auditlogs.go:17:6
+export interface AuditLog {
+  readonly id: string
+  readonly time: string
+  readonly user_id: string
+  readonly organization_id: string
+  // This is likely an enum in an external package ("net.IP")
+  readonly ip: string
+  readonly user_agent: string
+  // This is likely an enum in an external package ("github.com/coder/coder/coderd/database.ResourceType")
+  readonly resource_type: string
+  readonly resource_id: string
+  readonly resource_target: string
+  // This is likely an enum in an external package ("github.com/coder/coder/coderd/database.AuditAction")
+  readonly action: string
+  // This is likely an enum in an external package ("encoding/json.RawMessage")
+  readonly diff: string
+  readonly status_code: number
+}
+
+// From codersdk/auditlogs.go:13:6
+export interface AuditLogResponse {
+  readonly audit_logs: AuditLog[]
+}
+
 // From codersdk/users.go:150:6
 export interface AuthMethods {
   readonly password: boolean
