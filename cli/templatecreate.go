@@ -70,7 +70,7 @@ func templateCreate() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
+			fmt.Println("about to tar")
 			spin := spinner.New(spinner.CharSets[5], 100*time.Millisecond)
 			spin.Writer = cmd.OutOrStdout()
 			spin.Suffix = cliui.Styles.Keyword.Render(" Uploading current directory...")
@@ -80,18 +80,20 @@ func templateCreate() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			fmt.Println("tar'd")
 
 			resp, err := client.Upload(cmd.Context(), codersdk.ContentTypeTar, archive)
 			if err != nil {
 				return err
 			}
 			spin.Stop()
+			fmt.Println("uploaded")
 
 			job, parameters, err := createValidTemplateVersion(cmd, client, organization, database.ProvisionerType(provisioner), resp.Hash)
 			if err != nil {
 				return err
 			}
-
+			fmt.Println("template version created")
 			if !yes {
 				_, err = cliui.Prompt(cmd, cliui.PromptOptions{
 					Text:      "Confirm create?",
@@ -144,6 +146,7 @@ func createValidTemplateVersion(cmd *cobra.Command, client *codersdk.Client, org
 	if err != nil {
 		return nil, nil, err
 	}
+	fmt.Println("created template version")
 
 	err = cliui.ProvisionerJob(cmd.Context(), cmd.OutOrStdout(), cliui.ProvisionerJobOptions{
 		Fetch: func() (codersdk.ProvisionerJob, error) {

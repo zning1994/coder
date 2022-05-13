@@ -214,8 +214,9 @@ func (e *ProvisionerStorageMethod) Scan(src interface{}) error {
 type ProvisionerType string
 
 const (
-	ProvisionerTypeEcho      ProvisionerType = "echo"
-	ProvisionerTypeTerraform ProvisionerType = "terraform"
+	ProvisionerTypeEcho          ProvisionerType = "echo"
+	ProvisionerTypeTerraform     ProvisionerType = "terraform"
+	ProvisionerTypeDockercompose ProvisionerType = "dockercompose"
 )
 
 func (e *ProvisionerType) Scan(src interface{}) error {

@@ -536,7 +536,7 @@ func (p *Server) runTemplateImport(ctx, shutdown context.Context, provisioner sd
 		WorkspaceTransition: sdkproto.WorkspaceTransition_STOP,
 	})
 	if err != nil {
-		p.failActiveJobf("template import provision for start: %s", err)
+		p.failActiveJobf("template import provision for stop: %s", err)
 		return
 	}
 

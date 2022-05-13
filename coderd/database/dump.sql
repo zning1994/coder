@@ -59,7 +59,8 @@ CREATE TYPE provisioner_storage_method AS ENUM (
 
 CREATE TYPE provisioner_type AS ENUM (
     'echo',
-    'terraform'
+    'terraform',
+    'dockercompose'
 );
 
 CREATE TYPE resource_type AS ENUM (

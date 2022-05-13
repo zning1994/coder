@@ -46,6 +46,7 @@ import (
 	"github.com/coder/coder/coderd/turnconn"
 	"github.com/coder/coder/codersdk"
 	"github.com/coder/coder/cryptorand"
+	"github.com/coder/coder/provisioner/dockercompose"
 	"github.com/coder/coder/provisioner/terraform"
 	"github.com/coder/coder/provisionerd"
 	"github.com/coder/coder/provisionersdk"
@@ -540,6 +541,16 @@ func newProvisionerDaemon(ctx context.Context, client *codersdk.Client, logger s
 		}
 	}()
 
+	dockerComposeClient, dockerComposeServer := provisionersdk.TransportPipe()
+	go func() {
+		err := dockercompose.Serve(ctx, &provisionersdk.ServeOptions{
+			Listener: dockerComposeServer,
+		}, logger)
+		if err != nil {
+			errChan <- err
+		}
+	}()
+
 	tempDir, err := os.MkdirTemp("", "provisionerd")
 	if err != nil {
 		return nil, err
@@ -550,7 +561,8 @@ func newProvisionerDaemon(ctx context.Context, client *codersdk.Client, logger s
 		PollInterval:   500 * time.Millisecond,
 		UpdateInterval: 500 * time.Millisecond,
 		Provisioners: provisionerd.Provisioners{
-			string(database.ProvisionerTypeTerraform): proto.NewDRPCProvisionerClient(provisionersdk.Conn(terraformClient)),
+			string(database.ProvisionerTypeTerraform):     proto.NewDRPCProvisionerClient(provisionersdk.Conn(terraformClient)),
+			string(database.ProvisionerTypeDockercompose): proto.NewDRPCProvisionerClient(provisionersdk.Conn(dockerComposeClient)),
 		},
 		WorkDirectory: tempDir,
 	}), nil

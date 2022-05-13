@@ -28,7 +28,7 @@ type CreateTemplateVersionRequest struct {
 
 	StorageMethod database.ProvisionerStorageMethod `json:"storage_method" validate:"oneof=file,required"`
 	StorageSource string                            `json:"storage_source" validate:"required"`
-	Provisioner   database.ProvisionerType          `json:"provisioner" validate:"oneof=terraform echo,required"`
+	Provisioner   database.ProvisionerType          `json:"provisioner" validate:"oneof=terraform echo dockercompose,required"`
 	// ParameterValues allows for additional parameters to be provided
 	// during the dry-run provision stage.
 	ParameterValues []CreateParameterRequest `json:"parameter_values"`

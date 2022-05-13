@@ -53,10 +53,14 @@ func (api *api) provisionerDaemonsListen(rw http.ResponseWriter, r *http.Request
 	conn.SetReadLimit(256 * 1024)
 
 	daemon, err := api.Database.InsertProvisionerDaemon(r.Context(), database.InsertProvisionerDaemonParams{
-		ID:           uuid.New(),
-		CreatedAt:    database.Now(),
-		Name:         namesgenerator.GetRandomName(1),
-		Provisioners: []database.ProvisionerType{database.ProvisionerTypeEcho, database.ProvisionerTypeTerraform},
+		ID:        uuid.New(),
+		CreatedAt: database.Now(),
+		Name:      namesgenerator.GetRandomName(1),
+		Provisioners: []database.ProvisionerType{
+			database.ProvisionerTypeEcho,
+			database.ProvisionerTypeTerraform,
+			database.ProvisionerTypeDockercompose,
+		},
 	})
 	if err != nil {
 		_ = conn.Close(websocket.StatusInternalError, httpapi.WebsocketCloseSprintf("insert provisioner daemon: %s", err))

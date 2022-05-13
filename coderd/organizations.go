@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"cdr.dev/slog"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/moby/moby/pkg/namesgenerator"
@@ -48,6 +50,7 @@ func (api *api) postTemplateVersionsByOrganization(rw http.ResponseWriter, r *ht
 	if !httpapi.Read(rw, r, &req) {
 		return
 	}
+	api.Logger.Info(r.Context(), "POST template version", slog.Field{"provisioner", req.Provisioner})
 	if req.TemplateID != uuid.Nil {
 		_, err := api.Database.GetTemplateByID(r.Context(), req.TemplateID)
 		if errors.Is(err, sql.ErrNoRows) {
