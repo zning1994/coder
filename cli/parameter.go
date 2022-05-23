@@ -3,10 +3,9 @@ package cli
 import (
 	"os"
 
+	"github.com/spf13/cobra"
 	"golang.org/x/xerrors"
 	"gopkg.in/yaml.v3"
-
-	"github.com/spf13/cobra"
 
 	"github.com/coder/coder/cli/cliui"
 	"github.com/coder/coder/codersdk"

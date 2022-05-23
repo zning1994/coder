@@ -332,6 +332,7 @@ func (api *api) patchCancelWorkspaceBuild(rw http.ResponseWriter, r *http.Reques
 		})
 		return
 	}
+
 	if job.CompletedAt.Valid {
 		httpapi.Write(rw, http.StatusPreconditionFailed, httpapi.Response{
 			Message: "Job has already completed!",
@@ -344,6 +345,7 @@ func (api *api) patchCancelWorkspaceBuild(rw http.ResponseWriter, r *http.Reques
 		})
 		return
 	}
+
 	err = api.Database.UpdateProvisionerJobWithCancelByID(r.Context(), database.UpdateProvisionerJobWithCancelByIDParams{
 		ID: job.ID,
 		CanceledAt: sql.NullTime{
@@ -357,9 +359,8 @@ func (api *api) patchCancelWorkspaceBuild(rw http.ResponseWriter, r *http.Reques
 		})
 		return
 	}
-	httpapi.Write(rw, http.StatusOK, httpapi.Response{
-		Message: "Job has been marked as canceled...",
-	})
+
+	httpapi.Write(rw, http.StatusOK, http.StatusNoContent)
 }
 
 func (api *api) workspaceBuildResources(rw http.ResponseWriter, r *http.Request) {

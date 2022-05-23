@@ -182,7 +182,7 @@ func Tar(responses *Responses) ([]byte, error) {
 			return nil, err
 		}
 	}
-	err := writer.Flush()
+	err := writer.Close()
 	if err != nil {
 		return nil, err
 	}

@@ -12,8 +12,9 @@ import (
 
 func templateDelete() *cobra.Command {
 	return &cobra.Command{
-		Use:   "delete [name...]",
-		Short: "Delete templates",
+		Use:     "delete [name...]",
+		Short:   "Delete templates",
+		Aliases: []string{"rm"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var (
 				ctx           = cmd.Context()

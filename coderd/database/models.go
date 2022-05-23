@@ -216,6 +216,7 @@ type ProvisionerType string
 const (
 	ProvisionerTypeEcho      ProvisionerType = "echo"
 	ProvisionerTypeTerraform ProvisionerType = "terraform"
+	ProvisionerTypeSleep     ProvisionerType = "sleep"
 )
 
 func (e *ProvisionerType) Scan(src interface{}) error {
