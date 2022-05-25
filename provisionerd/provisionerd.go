@@ -76,6 +76,8 @@ func New(clientDialer Dialer, opts *Options) *Server {
 
 		jobRunning: make(chan struct{}),
 		jobFailed:  *atomic.NewBool(true),
+
+		levelLogger: &levelLogger{slog.Logger{}},
 	}
 	// Start off with a closed channel so
 	// isRunningJob() returns properly.
@@ -106,6 +108,8 @@ type Server struct {
 	jobRunning      chan struct{}
 	jobFailed       atomic.Bool
 	jobCancel       context.CancelFunc
+
+	levelLogger *levelLogger
 }
 
 // Connect establishes a connection to coderd.
@@ -804,8 +808,7 @@ func (p *Server) runWorkspaceBuild(ctx, shutdown context.Context, provisioner sd
 		}
 		switch msgType := msg.Type.(type) {
 		case *sdkproto.Provision_Response_Log:
-			p.opts.Logger.Debug(context.Background(), "workspace provision job logged",
-				slog.F("level", msgType.Log.Level),
+			p.levelLogger.LogWithLevel(context.Background(), msgType.Log.Level, "workspace provision job logged",
 				slog.F("output", msgType.Log.Output),
 				slog.F("workspace_build_id", job.GetWorkspaceBuild().WorkspaceBuildId),
 			)
@@ -1000,4 +1003,23 @@ func (p *Server) closeWithError(err error) error {
 	p.opts.Logger.Debug(context.Background(), "closing server with error", slog.Error(err))
 
 	return err
+}
+
+type levelLogger struct {
+	slog.Logger
+}
+
+func (l *levelLogger) LogWithLevel(ctx context.Context, level sdkproto.LogLevel, msg string, fields ...slog.Field) {
+	switch level {
+	case sdkproto.LogLevel_DEBUG:
+		l.Debug(ctx, msg, fields...)
+	case sdkproto.LogLevel_TRACE:
+		l.Debug(ctx, msg, fields...)
+	case sdkproto.LogLevel_ERROR:
+		l.Error(ctx, msg, fields...)
+	case sdkproto.LogLevel_WARN:
+		l.Warn(ctx, msg, fields...)
+	default:
+		l.Info(ctx, msg, fields...)
+	}
 }
