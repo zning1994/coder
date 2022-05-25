@@ -61,9 +61,10 @@ resource "coder_agent" "dev" {
 variable "docker_image" {
   description = "Which Docker image would you like to use for your workspace?"
   # The codercom/enterprise-* images are only built for amd64
-  default = "codercom/enterprise-base:ubuntu"
+  # TODO(cian): broken explicitly for testing, un-break
+  default = "codercom/enterprise-base:ubuntuu"
   validation {
-    condition     = contains(["codercom/enterprise-base:ubuntu", "codercom/enterprise-node:ubuntu", "codercom/enterprise-intellij:ubuntu"], var.docker_image)
+    condition     = contains(["codercom/enterprise-base:ubuntuu", "codercom/enterprise-node:ubuntu", "codercom/enterprise-intellij:ubuntu"], var.docker_image)
     error_message = "Invalid Docker image!"
   }
 

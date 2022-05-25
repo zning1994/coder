@@ -77,7 +77,7 @@ func New(clientDialer Dialer, opts *Options) *Server {
 		jobRunning: make(chan struct{}),
 		jobFailed:  *atomic.NewBool(true),
 
-		levelLogger: &levelLogger{slog.Logger{}},
+		jobLogger: &levelLogger{opts.Logger},
 	}
 	// Start off with a closed channel so
 	// isRunningJob() returns properly.
@@ -109,7 +109,7 @@ type Server struct {
 	jobFailed       atomic.Bool
 	jobCancel       context.CancelFunc
 
-	levelLogger *levelLogger
+	jobLogger *levelLogger
 }
 
 // Connect establishes a connection to coderd.
@@ -808,7 +808,7 @@ func (p *Server) runWorkspaceBuild(ctx, shutdown context.Context, provisioner sd
 		}
 		switch msgType := msg.Type.(type) {
 		case *sdkproto.Provision_Response_Log:
-			p.levelLogger.LogWithLevel(context.Background(), msgType.Log.Level, "workspace provision job logged",
+			p.jobLogger.LogWithLevel(context.Background(), msgType.Log.Level, "workspace provision job logged",
 				slog.F("output", msgType.Log.Output),
 				slog.F("workspace_build_id", job.GetWorkspaceBuild().WorkspaceBuildId),
 			)
