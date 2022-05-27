@@ -14,6 +14,10 @@ Coder creates remote development machines so you can develop your code from anyw
   <img src="./docs/images/hero-image.png">
 </p>
 
+> **Warning**
+> This is an alpha version of Coder. It is not ready for production use. We
+welcome early and constructive feedback via GitHub issues and [Discord](https://discord.gg/coder)
+
 **Code more**
 
 - Build and test faster
