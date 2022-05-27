@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/coder/coder/cli/clitest"
@@ -35,7 +36,7 @@ func TestLogin(t *testing.T) {
 		go func() {
 			defer close(doneChan)
 			err := root.Execute()
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}()
 
 		matches := []string{
@@ -43,6 +44,7 @@ func TestLogin(t *testing.T) {
 			"username", "testuser",
 			"email", "user@coder.com",
 			"password", "password",
+			"password", "password", // Confirm.
 		}
 		for i := 0; i < len(matches); i += 2 {
 			match := matches[i]
@@ -51,6 +53,44 @@ func TestLogin(t *testing.T) {
 			pty.WriteLine(value)
 		}
 		pty.ExpectMatch("Welcome to Coder")
+		<-doneChan
+	})
+
+	t.Run("InitialUserTTYConfirmPasswordFailAndReprompt", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		client := coderdtest.New(t, nil)
+		// The --force-tty flag is required on Windows, because the `isatty` library does not
+		// accurately detect Windows ptys when they are not attached to a process:
+		// https://github.com/mattn/go-isatty/issues/59
+		doneChan := make(chan struct{})
+		root, _ := clitest.New(t, "login", "--force-tty", client.URL.String())
+		pty := ptytest.New(t)
+		root.SetIn(pty.Input())
+		root.SetOut(pty.Output())
+		go func() {
+			defer close(doneChan)
+			err := root.ExecuteContext(ctx)
+			assert.ErrorIs(t, err, context.Canceled)
+		}()
+
+		matches := []string{
+			"first user?", "yes",
+			"username", "testuser",
+			"email", "user@coder.com",
+			"password", "mypass",
+			"password", "wrongpass", // Confirm.
+		}
+		for i := 0; i < len(matches); i += 2 {
+			match := matches[i]
+			value := matches[i+1]
+			pty.ExpectMatch(match)
+			pty.WriteLine(value)
+		}
+		pty.ExpectMatch("Passwords do not match")
+		pty.ExpectMatch("password") // Re-prompt password.
+		cancel()
 		<-doneChan
 	})
 
@@ -67,7 +107,7 @@ func TestLogin(t *testing.T) {
 		go func() {
 			defer close(doneChan)
 			err := root.Execute()
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}()
 
 		pty.ExpectMatch("Paste your token here:")
@@ -92,7 +132,7 @@ func TestLogin(t *testing.T) {
 			defer close(doneChan)
 			err := root.ExecuteContext(ctx)
 			// An error is expected in this case, since the login wasn't successful:
-			require.Error(t, err)
+			assert.Error(t, err)
 		}()
 
 		pty.ExpectMatch("Paste your token here:")
@@ -100,5 +140,17 @@ func TestLogin(t *testing.T) {
 		pty.ExpectMatch("That's not a valid token!")
 		cancelFunc()
 		<-doneChan
+	})
+
+	t.Run("TokenFlag", func(t *testing.T) {
+		t.Parallel()
+		client := coderdtest.New(t, nil)
+		coderdtest.CreateFirstUser(t, client)
+		root, cfg := clitest.New(t, "login", client.URL.String(), "--token", client.SessionToken)
+		err := root.Execute()
+		require.NoError(t, err)
+		sessionFile, err := cfg.Session().Read()
+		require.NoError(t, err)
+		require.Equal(t, client.SessionToken, sessionFile)
 	})
 }

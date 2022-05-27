@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path"
 	"runtime"
 	"strings"
 
@@ -37,8 +38,9 @@ func init() {
 
 func login() *cobra.Command {
 	return &cobra.Command{
-		Use:  "login <url>",
-		Args: cobra.ExactArgs(1),
+		Use:   "login <url>",
+		Short: "Authenticate with a Coder deployment",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			rawURL := args[0]
 
@@ -117,6 +119,19 @@ func login() *cobra.Command {
 				if err != nil {
 					return xerrors.Errorf("specify password prompt: %w", err)
 				}
+				_, err = cliui.Prompt(cmd, cliui.PromptOptions{
+					Text:   "Confirm " + cliui.Styles.Field.Render("password") + ":",
+					Secret: true,
+					Validate: func(s string) error {
+						if s != password {
+							return xerrors.Errorf("Passwords do not match")
+						}
+						return nil
+					},
+				})
+				if err != nil {
+					return xerrors.Errorf("confirm password prompt: %w", err)
+				}
 
 				_, err = client.CreateFirstUser(cmd.Context(), codersdk.CreateFirstUserRequest{
 					Email:            email,
@@ -150,32 +165,37 @@ func login() *cobra.Command {
 					cliui.Styles.Paragraph.Render(fmt.Sprintf("Welcome to Coder, %s! You're authenticated.", cliui.Styles.Keyword.Render(username)))+"\n")
 
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(),
-					cliui.Styles.Paragraph.Render("Get started by creating a template: "+cliui.Styles.Code.Render("coder templates create"))+"\n")
+					cliui.Styles.Paragraph.Render("Get started by creating a template: "+cliui.Styles.Code.Render("coder templates init"))+"\n")
 				return nil
 			}
 
-			authURL := *serverURL
-			authURL.Path = serverURL.Path + "/cli-auth"
-			if err := openURL(cmd, authURL.String()); err != nil {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Open the following in your browser:\n\n\t%s\n\n", authURL.String())
-			} else {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Your browser has been opened to visit:\n\n\t%s\n\n", authURL.String())
-			}
+			sessionToken, _ := cmd.Flags().GetString(varToken)
+			if sessionToken == "" {
+				authURL := *serverURL
+				// Don't use filepath.Join, we don't want to use the os separator
+				// for a url.
+				authURL.Path = path.Join(serverURL.Path, "/cli-auth")
+				if err := openURL(cmd, authURL.String()); err != nil {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Open the following in your browser:\n\n\t%s\n\n", authURL.String())
+				} else {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Your browser has been opened to visit:\n\n\t%s\n\n", authURL.String())
+				}
 
-			sessionToken, err := cliui.Prompt(cmd, cliui.PromptOptions{
-				Text:   "Paste your token here:",
-				Secret: true,
-				Validate: func(token string) error {
-					client.SessionToken = token
-					_, err := client.User(cmd.Context(), codersdk.Me)
-					if err != nil {
-						return xerrors.New("That's not a valid token!")
-					}
-					return err
-				},
-			})
-			if err != nil {
-				return xerrors.Errorf("paste token prompt: %w", err)
+				sessionToken, err = cliui.Prompt(cmd, cliui.PromptOptions{
+					Text:   "Paste your token here:",
+					Secret: true,
+					Validate: func(token string) error {
+						client.SessionToken = token
+						_, err := client.User(cmd.Context(), codersdk.Me)
+						if err != nil {
+							return xerrors.New("That's not a valid token!")
+						}
+						return err
+					},
+				})
+				if err != nil {
+					return xerrors.Errorf("paste token prompt: %w", err)
+				}
 			}
 
 			// Login to get user data - verify it is OK before persisting

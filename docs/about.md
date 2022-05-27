@@ -48,14 +48,14 @@ layer of infrastructure control. This additional layer allows admins to:
 - Enable persistent workspaces, which are like local machines, but faster and
   hosted by a cloud service
 
-Coder includes [production-ready templates](../examples) for use with AWS EC2,
+Coder includes [production-ready templates](../examples/templates) for use with AWS EC2,
 Azure, Google Cloud, Kubernetes, and more.
 
-## What Coder is *not*
+## What Coder is _not_
 
 - Coder is not an infrastructure as code (IaC) platform. Terraform is the first
-  IaC *provisioner* in Coder, allowing Coder admins to define Terraform
- resources as Coder workspaces.
+  IaC _provisioner_ in Coder, allowing Coder admins to define Terraform
+  resources as Coder workspaces.
 
 - Coder is not a DevOps/CI platform. Coder workspaces can follow best practices
   for cloud service-based workloads, but Coder is not responsible for how you
@@ -70,10 +70,7 @@ Azure, Google Cloud, Kubernetes, and more.
 - Coder is not a SaaS/fully-managed offering. You must host
   Coder on a cloud service (AWS, Azure, GCP) or your private data center.
 
----
-
 Next: [Templates](./templates.md)
 
 [^1]: alexellis.io: [The Internet is my computer](https://blog.alexellis.io/the-internet-is-my-computer/)
-
 [^2]: slack.engineering: [Development environments at Slack](https://slack.engineering/development-environments-at-slack)

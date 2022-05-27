@@ -17,7 +17,6 @@ export const useStyles = makeStyles((theme) => ({
   layout: {
     display: "flex",
     flexDirection: "column",
-    gap: theme.spacing(4),
     alignItems: "center",
   },
   container: {

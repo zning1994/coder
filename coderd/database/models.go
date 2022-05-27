@@ -311,7 +311,7 @@ type AuditLog struct {
 	Time           time.Time       `db:"time" json:"time"`
 	UserID         uuid.UUID       `db:"user_id" json:"user_id"`
 	OrganizationID uuid.UUID       `db:"organization_id" json:"organization_id"`
-	Ip             pqtype.CIDR     `db:"ip" json:"ip"`
+	Ip             pqtype.Inet     `db:"ip" json:"ip"`
 	UserAgent      string          `db:"user_agent" json:"user_agent"`
 	ResourceType   ResourceType    `db:"resource_type" json:"resource_type"`
 	ResourceID     uuid.UUID       `db:"resource_id" json:"resource_id"`
@@ -391,12 +391,11 @@ type ParameterValue struct {
 }
 
 type ProvisionerDaemon struct {
-	ID             uuid.UUID         `db:"id" json:"id"`
-	CreatedAt      time.Time         `db:"created_at" json:"created_at"`
-	UpdatedAt      sql.NullTime      `db:"updated_at" json:"updated_at"`
-	OrganizationID uuid.NullUUID     `db:"organization_id" json:"organization_id"`
-	Name           string            `db:"name" json:"name"`
-	Provisioners   []ProvisionerType `db:"provisioners" json:"provisioners"`
+	ID           uuid.UUID         `db:"id" json:"id"`
+	CreatedAt    time.Time         `db:"created_at" json:"created_at"`
+	UpdatedAt    sql.NullTime      `db:"updated_at" json:"updated_at"`
+	Name         string            `db:"name" json:"name"`
+	Provisioners []ProvisionerType `db:"provisioners" json:"provisioners"`
 }
 
 type ProvisionerJob struct {
@@ -436,6 +435,7 @@ type Template struct {
 	Name            string          `db:"name" json:"name"`
 	Provisioner     ProvisionerType `db:"provisioner" json:"provisioner"`
 	ActiveVersionID uuid.UUID       `db:"active_version_id" json:"active_version_id"`
+	Description     string          `db:"description" json:"description"`
 }
 
 type TemplateVersion struct {
@@ -445,7 +445,7 @@ type TemplateVersion struct {
 	CreatedAt      time.Time     `db:"created_at" json:"created_at"`
 	UpdatedAt      time.Time     `db:"updated_at" json:"updated_at"`
 	Name           string        `db:"name" json:"name"`
-	Description    string        `db:"description" json:"description"`
+	Readme         string        `db:"readme" json:"readme"`
 	JobID          uuid.UUID     `db:"job_id" json:"job_id"`
 }
 
@@ -470,7 +470,7 @@ type Workspace struct {
 	Deleted           bool           `db:"deleted" json:"deleted"`
 	Name              string         `db:"name" json:"name"`
 	AutostartSchedule sql.NullString `db:"autostart_schedule" json:"autostart_schedule"`
-	AutostopSchedule  sql.NullString `db:"autostop_schedule" json:"autostop_schedule"`
+	Ttl               sql.NullInt64  `db:"ttl" json:"ttl"`
 }
 
 type WorkspaceAgent struct {
@@ -500,12 +500,12 @@ type WorkspaceBuild struct {
 	WorkspaceID       uuid.UUID           `db:"workspace_id" json:"workspace_id"`
 	TemplateVersionID uuid.UUID           `db:"template_version_id" json:"template_version_id"`
 	Name              string              `db:"name" json:"name"`
-	BeforeID          uuid.NullUUID       `db:"before_id" json:"before_id"`
-	AfterID           uuid.NullUUID       `db:"after_id" json:"after_id"`
+	BuildNumber       int32               `db:"build_number" json:"build_number"`
 	Transition        WorkspaceTransition `db:"transition" json:"transition"`
 	InitiatorID       uuid.UUID           `db:"initiator_id" json:"initiator_id"`
 	ProvisionerState  []byte              `db:"provisioner_state" json:"provisioner_state"`
 	JobID             uuid.UUID           `db:"job_id" json:"job_id"`
+	Deadline          time.Time           `db:"deadline" json:"deadline"`
 }
 
 type WorkspaceResource struct {

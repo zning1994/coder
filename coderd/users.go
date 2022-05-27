@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -26,7 +25,7 @@ import (
 )
 
 // Returns whether the initial user has been created or not.
-func (api *api) firstUser(rw http.ResponseWriter, r *http.Request) {
+func (api *API) firstUser(rw http.ResponseWriter, r *http.Request) {
 	userCount, err := api.Database.GetUserCount(r.Context())
 	if err != nil {
 		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
@@ -48,7 +47,7 @@ func (api *api) firstUser(rw http.ResponseWriter, r *http.Request) {
 }
 
 // Creates the initial user for a Coder deployment.
-func (api *api) postFirstUser(rw http.ResponseWriter, r *http.Request) {
+func (api *API) postFirstUser(rw http.ResponseWriter, r *http.Request) {
 	var createUser codersdk.CreateFirstUserRequest
 	if !httpapi.Read(rw, r, &createUser) {
 		return
@@ -104,57 +103,33 @@ func (api *api) postFirstUser(rw http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (api *api) users(rw http.ResponseWriter, r *http.Request) {
+func (api *API) users(rw http.ResponseWriter, r *http.Request) {
 	var (
-		afterArg     = r.URL.Query().Get("after_user")
-		limitArg     = r.URL.Query().Get("limit")
-		offsetArg    = r.URL.Query().Get("offset")
 		searchName   = r.URL.Query().Get("search")
 		statusFilter = r.URL.Query().Get("status")
 	)
 
-	// createdAfter is a user uuid.
-	createdAfter := uuid.Nil
-	if afterArg != "" {
-		after, err := uuid.Parse(afterArg)
-		if err != nil {
-			httpapi.Write(rw, http.StatusBadRequest, httpapi.Response{
-				Message: fmt.Sprintf("after_user must be a valid uuid: %s", err.Error()),
-			})
-			return
-		}
-		createdAfter = after
+	// Reading all users across the site
+	if !api.Authorize(rw, r, rbac.ActionRead, rbac.ResourceUser) {
+		return
 	}
 
-	// Default to no limit and return all users.
-	pageLimit := -1
-	if limitArg != "" {
-		limit, err := strconv.Atoi(limitArg)
-		if err != nil {
-			httpapi.Write(rw, http.StatusBadRequest, httpapi.Response{
-				Message: fmt.Sprintf("limit must be an integer: %s", err.Error()),
-			})
-			return
-		}
-		pageLimit = limit
-	}
-
-	// The default for empty string is 0.
-	offset, err := strconv.ParseInt(offsetArg, 10, 64)
-	if offsetArg != "" && err != nil {
-		httpapi.Write(rw, http.StatusBadRequest, httpapi.Response{
-			Message: fmt.Sprintf("offset must be an integer: %s", err.Error()),
-		})
+	paginationParams, ok := parsePagination(rw, r)
+	if !ok {
 		return
 	}
 
 	users, err := api.Database.GetUsers(r.Context(), database.GetUsersParams{
-		AfterUser: createdAfter,
-		OffsetOpt: int32(offset),
-		LimitOpt:  int32(pageLimit),
+		AfterID:   paginationParams.AfterID,
+		OffsetOpt: int32(paginationParams.Offset),
+		LimitOpt:  int32(paginationParams.Limit),
 		Search:    searchName,
 		Status:    statusFilter,
 	})
+	if errors.Is(err, sql.ErrNoRows) {
+		httpapi.Write(rw, http.StatusOK, []codersdk.User{})
+		return
+	}
 	if err != nil {
 		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
 			Message: err.Error(),
@@ -186,13 +161,25 @@ func (api *api) users(rw http.ResponseWriter, r *http.Request) {
 }
 
 // Creates a new user.
-func (api *api) postUser(rw http.ResponseWriter, r *http.Request) {
-	apiKey := httpmw.APIKey(r)
+func (api *API) postUser(rw http.ResponseWriter, r *http.Request) {
+	// Create the user on the site
+	if !api.Authorize(rw, r, rbac.ActionCreate, rbac.ResourceUser) {
+		return
+	}
 
 	var createUser codersdk.CreateUserRequest
 	if !httpapi.Read(rw, r, &createUser) {
 		return
 	}
+
+	// Create the organization member in the org.
+	if !api.Authorize(rw, r, rbac.ActionCreate,
+		rbac.ResourceOrganizationMember.InOrg(createUser.OrganizationID)) {
+		return
+	}
+
+	// TODO: @emyrk Authorize the organization create if the createUser will do that.
+
 	_, err := api.Database.GetUserByEmailOrUsername(r.Context(), database.GetUserByEmailOrUsernameParams{
 		Username: createUser.Username,
 		Email:    createUser.Email,
@@ -210,7 +197,7 @@ func (api *api) postUser(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	organization, err := api.Database.GetOrganizationByID(r.Context(), createUser.OrganizationID)
+	_, err = api.Database.GetOrganizationByID(r.Context(), createUser.OrganizationID)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpapi.Write(rw, http.StatusNotFound, httpapi.Response{
 			Message: "organization does not exist with the provided id",
@@ -220,23 +207,6 @@ func (api *api) postUser(rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
 			Message: fmt.Sprintf("get organization: %s", err),
-		})
-		return
-	}
-	// Check if the caller has permissions to the organization requested.
-	_, err = api.Database.GetOrganizationMemberByUserID(r.Context(), database.GetOrganizationMemberByUserIDParams{
-		OrganizationID: organization.ID,
-		UserID:         apiKey.UserID,
-	})
-	if errors.Is(err, sql.ErrNoRows) {
-		httpapi.Write(rw, http.StatusUnauthorized, httpapi.Response{
-			Message: "you are not authorized to add members to that organization",
-		})
-		return
-	}
-	if err != nil {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: fmt.Sprintf("get organization member: %s", err),
 		})
 		return
 	}
@@ -254,9 +224,13 @@ func (api *api) postUser(rw http.ResponseWriter, r *http.Request) {
 
 // Returns the parameterized user requested. All validation
 // is completed in the middleware for this route.
-func (api *api) userByName(rw http.ResponseWriter, r *http.Request) {
+func (api *API) userByName(rw http.ResponseWriter, r *http.Request) {
 	user := httpmw.UserParam(r)
 	organizationIDs, err := userOrganizationIDs(r.Context(), api, user)
+
+	if !api.Authorize(rw, r, rbac.ActionRead, rbac.ResourceUser.WithID(user.ID.String())) {
+		return
+	}
 
 	if err != nil {
 		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
@@ -268,8 +242,12 @@ func (api *api) userByName(rw http.ResponseWriter, r *http.Request) {
 	httpapi.Write(rw, http.StatusOK, convertUser(user, organizationIDs))
 }
 
-func (api *api) putUserProfile(rw http.ResponseWriter, r *http.Request) {
+func (api *API) putUserProfile(rw http.ResponseWriter, r *http.Request) {
 	user := httpmw.UserParam(r)
+
+	if !api.Authorize(rw, r, rbac.ActionUpdate, rbac.ResourceUser.WithID(user.ID.String())) {
+		return
+	}
 
 	var params codersdk.UpdateUserProfileRequest
 	if !httpapi.Read(rw, r, &params) {
@@ -296,7 +274,7 @@ func (api *api) putUserProfile(rw http.ResponseWriter, r *http.Request) {
 			})
 		}
 		httpapi.Write(rw, http.StatusConflict, httpapi.Response{
-			Message: fmt.Sprintf("user already exists"),
+			Message: "user already exists",
 			Errors:  responseErrors,
 		})
 		return
@@ -333,35 +311,89 @@ func (api *api) putUserProfile(rw http.ResponseWriter, r *http.Request) {
 	httpapi.Write(rw, http.StatusOK, convertUser(updatedUserProfile, organizationIDs))
 }
 
-func (api *api) putUserSuspend(rw http.ResponseWriter, r *http.Request) {
-	user := httpmw.UserParam(r)
+func (api *API) putUserStatus(status database.UserStatus) func(rw http.ResponseWriter, r *http.Request) {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		user := httpmw.UserParam(r)
+		apiKey := httpmw.APIKey(r)
 
-	suspendedUser, err := api.Database.UpdateUserStatus(r.Context(), database.UpdateUserStatusParams{
-		ID:        user.ID,
-		Status:    database.UserStatusSuspended,
-		UpdatedAt: database.Now(),
-	})
+		if !api.Authorize(rw, r, rbac.ActionDelete, rbac.ResourceUser.WithID(user.ID.String())) {
+			return
+		}
 
-	if err != nil {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: fmt.Sprintf("put user suspended: %s", err.Error()),
+		if status == database.UserStatusSuspended && user.ID == apiKey.UserID {
+			httpapi.Write(rw, http.StatusBadRequest, httpapi.Response{
+				Message: "You cannot suspend yourself",
+			})
+			return
+		}
+
+		suspendedUser, err := api.Database.UpdateUserStatus(r.Context(), database.UpdateUserStatusParams{
+			ID:        user.ID,
+			Status:    status,
+			UpdatedAt: database.Now(),
 		})
-		return
-	}
 
-	organizations, err := userOrganizationIDs(r.Context(), api, user)
-	if err != nil {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: fmt.Sprintf("get organization IDs: %s", err.Error()),
-		})
-		return
-	}
+		if err != nil {
+			httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
+				Message: fmt.Sprintf("put user suspended: %s", err.Error()),
+			})
+			return
+		}
 
-	httpapi.Write(rw, http.StatusOK, convertUser(suspendedUser, organizations))
+		organizations, err := userOrganizationIDs(r.Context(), api, user)
+		if err != nil {
+			httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
+				Message: fmt.Sprintf("get organization IDs: %s", err.Error()),
+			})
+			return
+		}
+
+		httpapi.Write(rw, http.StatusOK, convertUser(suspendedUser, organizations))
+	}
 }
 
-func (api *api) userRoles(rw http.ResponseWriter, r *http.Request) {
+func (api *API) putUserPassword(rw http.ResponseWriter, r *http.Request) {
+	var (
+		user   = httpmw.UserParam(r)
+		params codersdk.UpdateUserPasswordRequest
+	)
+
+	if !api.Authorize(rw, r, rbac.ActionUpdate, rbac.ResourceUserData.WithOwner(user.ID.String())) {
+		return
+	}
+
+	if !httpapi.Read(rw, r, &params) {
+		return
+	}
+
+	hashedPassword, err := userpassword.Hash(params.Password)
+	if err != nil {
+		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
+			Message: fmt.Sprintf("hash password: %s", err.Error()),
+		})
+		return
+	}
+	err = api.Database.UpdateUserHashedPassword(r.Context(), database.UpdateUserHashedPasswordParams{
+		ID:             user.ID,
+		HashedPassword: []byte(hashedPassword),
+	})
+	if err != nil {
+		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
+			Message: fmt.Sprintf("put user password: %s", err.Error()),
+		})
+		return
+	}
+
+	httpapi.Write(rw, http.StatusNoContent, nil)
+}
+
+func (api *API) userRoles(rw http.ResponseWriter, r *http.Request) {
 	user := httpmw.UserParam(r)
+
+	if !api.Authorize(rw, r, rbac.ActionRead, rbac.ResourceUserData.
+		WithOwner(user.ID.String())) {
+		return
+	}
 
 	resp := codersdk.UserRoles{
 		Roles:             user.RBACRoles,
@@ -376,29 +408,41 @@ func (api *api) userRoles(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only include ones we can read from RBAC
+	memberships = AuthorizeFilter(api, r, rbac.ActionRead, memberships)
+
 	for _, mem := range memberships {
-		resp.OrganizationRoles[mem.OrganizationID] = mem.Roles
+		// If we can read the org member, include the roles
+		if err == nil {
+			resp.OrganizationRoles[mem.OrganizationID] = mem.Roles
+		}
 	}
 
 	httpapi.Write(rw, http.StatusOK, resp)
 }
 
-func (api *api) putUserRoles(rw http.ResponseWriter, r *http.Request) {
+func (api *API) putUserRoles(rw http.ResponseWriter, r *http.Request) {
 	// User is the user to modify
-	// TODO: Until rbac authorize is implemented, only be able to change your
-	//		own roles. This also means you can grant yourself whatever roles you want.
 	user := httpmw.UserParam(r)
-	apiKey := httpmw.APIKey(r)
-	if apiKey.UserID != user.ID {
-		httpapi.Write(rw, http.StatusUnauthorized, httpapi.Response{
-			Message: fmt.Sprintf("modifying other users is not supported at this time"),
-		})
-		return
-	}
+	roles := httpmw.UserRoles(r)
 
 	var params codersdk.UpdateRoles
 	if !httpapi.Read(rw, r, &params) {
 		return
+	}
+
+	added, removed := rbac.ChangeRoleSet(roles.Roles, params.Roles)
+	for _, roleName := range added {
+		// Assigning a role requires the create permission.
+		if !api.Authorize(rw, r, rbac.ActionCreate, rbac.ResourceRoleAssignment.WithID(roleName)) {
+			return
+		}
+	}
+	for _, roleName := range removed {
+		// Removing a role requires the delete permission.
+		if !api.Authorize(rw, r, rbac.ActionDelete, rbac.ResourceRoleAssignment.WithID(roleName)) {
+			return
+		}
 	}
 
 	updatedUser, err := api.updateSiteUserRoles(r.Context(), database.UpdateUserRolesParams{
@@ -423,7 +467,9 @@ func (api *api) putUserRoles(rw http.ResponseWriter, r *http.Request) {
 	httpapi.Write(rw, http.StatusOK, convertUser(updatedUser, organizationIDs))
 }
 
-func (api *api) updateSiteUserRoles(ctx context.Context, args database.UpdateUserRolesParams) (database.User, error) {
+// updateSiteUserRoles will ensure only site wide roles are passed in as arguments.
+// If an organization role is included, an error is returned.
+func (api *API) updateSiteUserRoles(ctx context.Context, args database.UpdateUserRolesParams) (database.User, error) {
 	// Enforce only site wide roles
 	for _, r := range args.GrantedRoles {
 		if _, ok := rbac.IsOrgRole(r); ok {
@@ -443,7 +489,7 @@ func (api *api) updateSiteUserRoles(ctx context.Context, args database.UpdateUse
 }
 
 // Returns organizations the parameterized user has access to.
-func (api *api) organizationsByUser(rw http.ResponseWriter, r *http.Request) {
+func (api *API) organizationsByUser(rw http.ResponseWriter, r *http.Request) {
 	user := httpmw.UserParam(r)
 
 	organizations, err := api.Database.GetOrganizationsByUserID(r.Context(), user.ID)
@@ -458,6 +504,9 @@ func (api *api) organizationsByUser(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only return orgs the user can read
+	organizations = AuthorizeFilter(api, r, rbac.ActionRead, organizations)
+
 	publicOrganizations := make([]codersdk.Organization, 0, len(organizations))
 	for _, organization := range organizations {
 		publicOrganizations = append(publicOrganizations, convertOrganization(organization))
@@ -466,101 +515,32 @@ func (api *api) organizationsByUser(rw http.ResponseWriter, r *http.Request) {
 	httpapi.Write(rw, http.StatusOK, publicOrganizations)
 }
 
-func (api *api) organizationByUserAndName(rw http.ResponseWriter, r *http.Request) {
-	user := httpmw.UserParam(r)
+func (api *API) organizationByUserAndName(rw http.ResponseWriter, r *http.Request) {
 	organizationName := chi.URLParam(r, "organizationname")
 	organization, err := api.Database.GetOrganizationByName(r.Context(), organizationName)
 	if errors.Is(err, sql.ErrNoRows) {
-		httpapi.Write(rw, http.StatusNotFound, httpapi.Response{
-			Message: fmt.Sprintf("no organization found by name %q", organizationName),
-		})
+		// Return unauthorized rather than a 404 to not leak if the organization
+		// exists.
+		httpapi.Forbidden(rw)
 		return
 	}
 	if err != nil {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: fmt.Sprintf("get organization by name: %s", err),
-		})
+		httpapi.Forbidden(rw)
 		return
 	}
-	_, err = api.Database.GetOrganizationMemberByUserID(r.Context(), database.GetOrganizationMemberByUserIDParams{
-		OrganizationID: organization.ID,
-		UserID:         user.ID,
-	})
-	if errors.Is(err, sql.ErrNoRows) {
-		httpapi.Write(rw, http.StatusUnauthorized, httpapi.Response{
-			Message: "you are not a member of that organization",
-		})
-		return
-	}
-	if err != nil {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: fmt.Sprintf("get organization member: %s", err),
-		})
+
+	if !api.Authorize(rw, r, rbac.ActionRead,
+		rbac.ResourceOrganization.
+			InOrg(organization.ID).
+			WithID(organization.ID.String())) {
 		return
 	}
 
 	httpapi.Write(rw, http.StatusOK, convertOrganization(organization))
 }
 
-func (api *api) postOrganizationsByUser(rw http.ResponseWriter, r *http.Request) {
-	user := httpmw.UserParam(r)
-	var req codersdk.CreateOrganizationRequest
-	if !httpapi.Read(rw, r, &req) {
-		return
-	}
-	_, err := api.Database.GetOrganizationByName(r.Context(), req.Name)
-	if err == nil {
-		httpapi.Write(rw, http.StatusConflict, httpapi.Response{
-			Message: "organization already exists with that name",
-		})
-		return
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: fmt.Sprintf("get organization: %s", err.Error()),
-		})
-		return
-	}
-
-	var organization database.Organization
-	err = api.Database.InTx(func(db database.Store) error {
-		organization, err = api.Database.InsertOrganization(r.Context(), database.InsertOrganizationParams{
-			ID:        uuid.New(),
-			Name:      req.Name,
-			CreatedAt: database.Now(),
-			UpdatedAt: database.Now(),
-		})
-		if err != nil {
-			return xerrors.Errorf("create organization: %w", err)
-		}
-		_, err = api.Database.InsertOrganizationMember(r.Context(), database.InsertOrganizationMemberParams{
-			OrganizationID: organization.ID,
-			UserID:         user.ID,
-			CreatedAt:      database.Now(),
-			UpdatedAt:      database.Now(),
-			Roles: []string{
-				// Also assign member role incase they get demoted from admin
-				rbac.RoleOrgMember(organization.ID),
-				rbac.RoleOrgAdmin(organization.ID),
-			},
-		})
-		if err != nil {
-			return xerrors.Errorf("create organization member: %w", err)
-		}
-		return nil
-	})
-	if err != nil {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: err.Error(),
-		})
-		return
-	}
-
-	httpapi.Write(rw, http.StatusCreated, convertOrganization(organization))
-}
-
 // Authenticates the user with an email and password.
-func (api *api) postLogin(rw http.ResponseWriter, r *http.Request) {
+func (api *API) postLogin(rw http.ResponseWriter, r *http.Request) {
 	var loginWithPassword codersdk.LoginWithPasswordRequest
 	if !httpapi.Read(rw, r, &loginWithPassword) {
 		return
@@ -577,7 +557,6 @@ func (api *api) postLogin(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	// If the user doesn't exist, it will be a default struct.
-
 	equal, err := userpassword.Compare(string(user.HashedPassword), loginWithPassword.Password)
 	if err != nil {
 		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
@@ -607,14 +586,10 @@ func (api *api) postLogin(rw http.ResponseWriter, r *http.Request) {
 }
 
 // Creates a new session key, used for logging in via the CLI
-func (api *api) postAPIKey(rw http.ResponseWriter, r *http.Request) {
+func (api *API) postAPIKey(rw http.ResponseWriter, r *http.Request) {
 	user := httpmw.UserParam(r)
-	apiKey := httpmw.APIKey(r)
 
-	if user.ID != apiKey.UserID {
-		httpapi.Write(rw, http.StatusUnauthorized, httpapi.Response{
-			Message: "Keys can only be generated for the authenticated user",
-		})
+	if !api.Authorize(rw, r, rbac.ActionCreate, rbac.ResourceAPIKey.WithOwner(user.ID.String())) {
 		return
 	}
 
@@ -630,12 +605,12 @@ func (api *api) postAPIKey(rw http.ResponseWriter, r *http.Request) {
 }
 
 // Clear the user's session cookie
-func (*api) postLogout(rw http.ResponseWriter, _ *http.Request) {
+func (*API) postLogout(rw http.ResponseWriter, _ *http.Request) {
 	// Get a blank token cookie
 	cookie := &http.Cookie{
 		// MaxAge < 0 means to delete the cookie now
 		MaxAge: -1,
-		Name:   httpmw.AuthCookie,
+		Name:   httpmw.SessionTokenKey,
 		Path:   "/",
 	}
 
@@ -660,7 +635,7 @@ func generateAPIKeyIDSecret() (id string, secret string, err error) {
 	return id, secret, nil
 }
 
-func (api *api) createAPIKey(rw http.ResponseWriter, r *http.Request, params database.InsertAPIKeyParams) (string, bool) {
+func (api *API) createAPIKey(rw http.ResponseWriter, r *http.Request, params database.InsertAPIKeyParams) (string, bool) {
 	keyID, keySecret, err := generateAPIKeyIDSecret()
 	if err != nil {
 		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
@@ -693,7 +668,7 @@ func (api *api) createAPIKey(rw http.ResponseWriter, r *http.Request, params dat
 	// This format is consumed by the APIKey middleware.
 	sessionToken := fmt.Sprintf("%s-%s", keyID, keySecret)
 	http.SetCookie(rw, &http.Cookie{
-		Name:     httpmw.AuthCookie,
+		Name:     httpmw.SessionTokenKey,
 		Value:    sessionToken,
 		Path:     "/",
 		HttpOnly: true,
@@ -703,7 +678,7 @@ func (api *api) createAPIKey(rw http.ResponseWriter, r *http.Request, params dat
 	return sessionToken, true
 }
 
-func (api *api) createUser(ctx context.Context, req codersdk.CreateUserRequest) (database.User, uuid.UUID, error) {
+func (api *API) createUser(ctx context.Context, req codersdk.CreateUserRequest) (database.User, uuid.UUID, error) {
 	var user database.User
 	return user, req.OrganizationID, api.Database.InTx(func(db database.Store) error {
 		var orgRoles []string
@@ -778,14 +753,22 @@ func (api *api) createUser(ctx context.Context, req codersdk.CreateUserRequest) 
 }
 
 func convertUser(user database.User, organizationIDs []uuid.UUID) codersdk.User {
-	return codersdk.User{
+	convertedUser := codersdk.User{
 		ID:              user.ID,
 		Email:           user.Email,
 		CreatedAt:       user.CreatedAt,
 		Username:        user.Username,
 		Status:          codersdk.UserStatus(user.Status),
 		OrganizationIDs: organizationIDs,
+		Roles:           make([]codersdk.Role, 0),
 	}
+
+	for _, roleName := range user.RBACRoles {
+		rbacRole, _ := rbac.RoleByName(roleName)
+		convertedUser.Roles = append(convertedUser.Roles, convertRole(rbacRole))
+	}
+
+	return convertedUser
 }
 
 func convertUsers(users []database.User, organizationIDsByUserID map[uuid.UUID][]uuid.UUID) []codersdk.User {
@@ -797,7 +780,7 @@ func convertUsers(users []database.User, organizationIDsByUserID map[uuid.UUID][
 	return converted
 }
 
-func userOrganizationIDs(ctx context.Context, api *api, user database.User) ([]uuid.UUID, error) {
+func userOrganizationIDs(ctx context.Context, api *API, user database.User) ([]uuid.UUID, error) {
 	organizationIDsByMemberIDsRows, err := api.Database.GetOrganizationIDsByMemberIDs(ctx, []uuid.UUID{user.ID})
 	if errors.Is(err, sql.ErrNoRows) || len(organizationIDsByMemberIDsRows) == 0 {
 		return []uuid.UUID{}, nil

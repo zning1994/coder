@@ -101,7 +101,7 @@ CREATE TABLE audit_logs (
     "time" timestamp with time zone NOT NULL,
     user_id uuid NOT NULL,
     organization_id uuid NOT NULL,
-    ip cidr NOT NULL,
+    ip inet NOT NULL,
     user_agent character varying(256) NOT NULL,
     resource_type resource_type NOT NULL,
     resource_id uuid NOT NULL,
@@ -194,7 +194,6 @@ CREATE TABLE provisioner_daemons (
     id uuid NOT NULL,
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone,
-    organization_id uuid,
     name character varying(64) NOT NULL,
     provisioners provisioner_type[] NOT NULL
 );
@@ -234,7 +233,7 @@ CREATE TABLE template_versions (
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone NOT NULL,
     name character varying(64) NOT NULL,
-    description character varying(1048576) NOT NULL,
+    readme character varying(1048576) NOT NULL,
     job_id uuid NOT NULL
 );
 
@@ -246,7 +245,8 @@ CREATE TABLE templates (
     deleted boolean DEFAULT false NOT NULL,
     name character varying(64) NOT NULL,
     provisioner provisioner_type NOT NULL,
-    active_version_id uuid NOT NULL
+    active_version_id uuid NOT NULL,
+    description character varying(128) DEFAULT ''::character varying NOT NULL
 );
 
 CREATE TABLE users (
@@ -287,12 +287,12 @@ CREATE TABLE workspace_builds (
     workspace_id uuid NOT NULL,
     template_version_id uuid NOT NULL,
     name character varying(64) NOT NULL,
-    before_id uuid,
-    after_id uuid,
+    build_number integer NOT NULL,
     transition workspace_transition NOT NULL,
     initiator_id uuid NOT NULL,
     provisioner_state bytea,
-    job_id uuid NOT NULL
+    job_id uuid NOT NULL,
+    deadline timestamp with time zone DEFAULT '0001-01-01 00:00:00+00'::timestamp with time zone NOT NULL
 );
 
 CREATE TABLE workspace_resources (
@@ -314,7 +314,7 @@ CREATE TABLE workspaces (
     deleted boolean DEFAULT false NOT NULL,
     name character varying(64) NOT NULL,
     autostart_schedule text,
-    autostop_schedule text
+    ttl bigint
 );
 
 ALTER TABLE ONLY licenses ALTER COLUMN id SET DEFAULT nextval('public.licenses_id_seq'::regclass);
@@ -387,6 +387,9 @@ ALTER TABLE ONLY workspace_builds
 
 ALTER TABLE ONLY workspace_builds
     ADD CONSTRAINT workspace_builds_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY workspace_builds
+    ADD CONSTRAINT workspace_builds_workspace_id_build_number_key UNIQUE (workspace_id, build_number);
 
 ALTER TABLE ONLY workspace_builds
     ADD CONSTRAINT workspace_builds_workspace_id_name_key UNIQUE (workspace_id, name);

@@ -28,7 +28,7 @@ import (
 	"github.com/coder/coder/provisionersdk"
 )
 
-func (api *api) workspaceAgent(rw http.ResponseWriter, r *http.Request) {
+func (api *API) workspaceAgent(rw http.ResponseWriter, r *http.Request) {
 	workspaceAgent := httpmw.WorkspaceAgentParam(r)
 	apiAgent, err := convertWorkspaceAgent(workspaceAgent, api.AgentConnectionUpdateFrequency)
 	if err != nil {
@@ -41,7 +41,7 @@ func (api *api) workspaceAgent(rw http.ResponseWriter, r *http.Request) {
 	httpapi.Write(rw, http.StatusOK, apiAgent)
 }
 
-func (api *api) workspaceAgentDial(rw http.ResponseWriter, r *http.Request) {
+func (api *API) workspaceAgentDial(rw http.ResponseWriter, r *http.Request) {
 	api.websocketWaitMutex.Lock()
 	api.websocketWaitGroup.Add(1)
 	api.websocketWaitMutex.Unlock()
@@ -90,7 +90,7 @@ func (api *api) workspaceAgentDial(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (api *api) workspaceAgentMetadata(rw http.ResponseWriter, r *http.Request) {
+func (api *API) workspaceAgentMetadata(rw http.ResponseWriter, r *http.Request) {
 	workspaceAgent := httpmw.WorkspaceAgent(r)
 	apiAgent, err := convertWorkspaceAgent(workspaceAgent, api.AgentConnectionUpdateFrequency)
 	if err != nil {
@@ -136,7 +136,7 @@ func (api *api) workspaceAgentMetadata(rw http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (api *api) workspaceAgentListen(rw http.ResponseWriter, r *http.Request) {
+func (api *API) workspaceAgentListen(rw http.ResponseWriter, r *http.Request) {
 	api.websocketWaitMutex.Lock()
 	api.websocketWaitGroup.Add(1)
 	api.websocketWaitMutex.Unlock()
@@ -212,11 +212,11 @@ func (api *api) workspaceAgentListen(rw http.ResponseWriter, r *http.Request) {
 	// Ensure the resource is still valid!
 	// We only accept agents for resources on the latest build.
 	ensureLatestBuild := func() error {
-		latestBuild, err := api.Database.GetWorkspaceBuildByWorkspaceIDWithoutAfter(r.Context(), build.WorkspaceID)
+		latestBuild, err := api.Database.GetLatestWorkspaceBuildByWorkspaceID(r.Context(), build.WorkspaceID)
 		if err != nil {
 			return err
 		}
-		if build.ID.String() != latestBuild.ID.String() {
+		if build.ID != latestBuild.ID {
 			return xerrors.New("build is outdated")
 		}
 		return nil
@@ -269,12 +269,12 @@ func (api *api) workspaceAgentListen(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (api *api) workspaceAgentICEServers(rw http.ResponseWriter, _ *http.Request) {
+func (api *API) workspaceAgentICEServers(rw http.ResponseWriter, _ *http.Request) {
 	httpapi.Write(rw, http.StatusOK, api.ICEServers)
 }
 
 // workspaceAgentTurn proxies a WebSocket connection to the TURN server.
-func (api *api) workspaceAgentTurn(rw http.ResponseWriter, r *http.Request) {
+func (api *API) workspaceAgentTurn(rw http.ResponseWriter, r *http.Request) {
 	api.websocketWaitMutex.Lock()
 	api.websocketWaitGroup.Add(1)
 	api.websocketWaitMutex.Unlock()
@@ -324,7 +324,7 @@ func (api *api) workspaceAgentTurn(rw http.ResponseWriter, r *http.Request) {
 
 // workspaceAgentPTY spawns a PTY and pipes it over a WebSocket.
 // This is used for the web terminal.
-func (api *api) workspaceAgentPTY(rw http.ResponseWriter, r *http.Request) {
+func (api *API) workspaceAgentPTY(rw http.ResponseWriter, r *http.Request) {
 	api.websocketWaitMutex.Lock()
 	api.websocketWaitGroup.Add(1)
 	api.websocketWaitMutex.Unlock()
@@ -395,7 +395,7 @@ func (api *api) workspaceAgentPTY(rw http.ResponseWriter, r *http.Request) {
 }
 
 // dialWorkspaceAgent connects to a workspace agent by ID.
-func (api *api) dialWorkspaceAgent(r *http.Request, agentID uuid.UUID) (*agent.Conn, error) {
+func (api *API) dialWorkspaceAgent(r *http.Request, agentID uuid.UUID) (*agent.Conn, error) {
 	client, server := provisionersdk.TransportPipe()
 	go func() {
 		_ = peerbroker.ProxyListen(r.Context(), server, peerbroker.ProxyOptions{

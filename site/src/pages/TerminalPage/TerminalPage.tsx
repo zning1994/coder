@@ -17,7 +17,7 @@ export const Language = {
   websocketErrorMessagePrefix: "WebSocket failed: ",
 }
 
-export const TerminalPage: React.FC<{
+const TerminalPage: React.FC<{
   readonly renderer?: XTerm.RendererType
 }> = ({ renderer }) => {
   const location = useLocation()
@@ -34,10 +34,14 @@ export const TerminalPage: React.FC<{
     const search = new URLSearchParams(location.search)
     return search.get("reconnect") ?? uuidv4()
   })
+  // The workspace name is in the format:
+  // <workspace name>[.<agent name>]
+  const workspaceNameParts = workspace?.split(".")
   const [terminalState, sendEvent] = useMachine(terminalMachine, {
     context: {
+      agentName: workspaceNameParts?.[1],
       reconnection: reconnectionToken,
-      workspaceName: workspace,
+      workspaceName: workspaceNameParts?.[0],
       username: username,
     },
     actions: {
@@ -199,6 +203,8 @@ export const TerminalPage: React.FC<{
     </>
   )
 }
+
+export default TerminalPage
 
 const useStyles = makeStyles(() => ({
   overlay: {

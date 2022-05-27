@@ -6,29 +6,30 @@ import (
 	"database/sql"
 	"testing"
 
+	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
 	"github.com/coder/coder/coderd/database/postgres"
-
-	_ "github.com/lib/pq"
 )
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
+// nolint:paralleltest
 func TestPostgres(t *testing.T) {
-	t.Parallel()
+	// postgres.Open() seems to be creating race conditions when run in parallel.
+	// t.Parallel()
 
 	if testing.Short() {
 		t.Skip()
 		return
 	}
 
-	connect, close, err := postgres.Open()
+	connect, closePg, err := postgres.Open()
 	require.NoError(t, err)
-	defer close()
+	defer closePg()
 	db, err := sql.Open("postgres", connect)
 	require.NoError(t, err)
 	err = db.Ping()

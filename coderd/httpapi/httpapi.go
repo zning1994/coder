@@ -62,6 +62,12 @@ type Error struct {
 	Detail string `json:"detail" validate:"required"`
 }
 
+func Forbidden(rw http.ResponseWriter) {
+	Write(rw, http.StatusForbidden, Response{
+		Message: "forbidden",
+	})
+}
+
 // Write outputs a standardized format to an HTTP response body.
 func Write(rw http.ResponseWriter, status int, response interface{}) {
 	buf := &bytes.Buffer{}
@@ -98,7 +104,7 @@ func Read(rw http.ResponseWriter, r *http.Request, value interface{}) bool {
 		for _, validationError := range validationErrors {
 			apiErrors = append(apiErrors, Error{
 				Field:  validationError.Field(),
-				Detail: validationError.Tag(),
+				Detail: fmt.Sprintf("Validation failed for tag %q with value: \"%v\"", validationError.Tag(), validationError.Value()),
 			})
 		}
 		Write(rw, http.StatusBadRequest, Response{

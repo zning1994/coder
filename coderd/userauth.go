@@ -28,14 +28,14 @@ type GithubOAuth2Config struct {
 	AllowOrganizations []string
 }
 
-func (api *api) userAuthMethods(rw http.ResponseWriter, _ *http.Request) {
+func (api *API) userAuthMethods(rw http.ResponseWriter, _ *http.Request) {
 	httpapi.Write(rw, http.StatusOK, codersdk.AuthMethods{
 		Password: true,
 		Github:   api.GithubOAuth2Config != nil,
 	})
 }
 
-func (api *api) userOAuth2Github(rw http.ResponseWriter, r *http.Request) {
+func (api *API) userOAuth2Github(rw http.ResponseWriter, r *http.Request) {
 	state := httpmw.OAuth2(r)
 
 	oauthClient := oauth2.NewClient(r.Context(), oauth2.StaticTokenSource(state.Token))
@@ -58,7 +58,7 @@ func (api *api) userOAuth2Github(rw http.ResponseWriter, r *http.Request) {
 	}
 	if selectedMembership == nil {
 		httpapi.Write(rw, http.StatusUnauthorized, httpapi.Response{
-			Message: fmt.Sprintf("You aren't a member of the authorized Github organizations!"),
+			Message: "You aren't a member of the authorized Github organizations!",
 		})
 		return
 	}

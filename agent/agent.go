@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/user"
@@ -20,9 +21,12 @@ import (
 	"time"
 
 	"github.com/armon/circbuf"
+	"github.com/gliderlabs/ssh"
 	"github.com/google/uuid"
-
+	"github.com/pkg/sftp"
 	"go.uber.org/atomic"
+	gossh "golang.org/x/crypto/ssh"
+	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
 	"github.com/coder/coder/agent/usershell"
@@ -30,12 +34,12 @@ import (
 	"github.com/coder/coder/peerbroker"
 	"github.com/coder/coder/pty"
 	"github.com/coder/retry"
+)
 
-	"github.com/pkg/sftp"
-
-	"github.com/gliderlabs/ssh"
-	gossh "golang.org/x/crypto/ssh"
-	"golang.org/x/xerrors"
+const (
+	ProtocolReconnectingPTY = "reconnecting-pty"
+	ProtocolSSH             = "ssh"
+	ProtocolDial            = "dial"
 )
 
 type Options struct {
@@ -173,17 +177,25 @@ func (*agent) runStartupScript(ctx context.Context, script string) error {
 	defer func() {
 		_ = writer.Close()
 	}()
+
 	caller := "-c"
 	if runtime.GOOS == "windows" {
 		caller = "/c"
 	}
+
 	cmd := exec.CommandContext(ctx, shell, caller, script)
 	cmd.Stdout = writer
 	cmd.Stderr = writer
 	err = cmd.Run()
 	if err != nil {
+		// cmd.Run does not return a context canceled error, it returns "signal: killed".
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		return xerrors.Errorf("run: %w", err)
 	}
+
 	return nil
 }
 
@@ -207,10 +219,12 @@ func (a *agent) handlePeerConn(ctx context.Context, conn *peer.Conn) {
 		}
 
 		switch channel.Protocol() {
-		case "ssh":
+		case ProtocolSSH:
 			go a.sshServer.HandleConn(channel.NetConn())
-		case "reconnecting-pty":
+		case ProtocolReconnectingPTY:
 			go a.handleReconnectingPTY(ctx, channel.Label(), channel.NetConn())
+		case ProtocolDial:
+			go a.handleDial(ctx, channel.Label(), channel.NetConn())
 		default:
 			a.logger.Warn(ctx, "unhandled protocol from channel",
 				slog.F("protocol", channel.Protocol()),
@@ -345,10 +359,12 @@ func (a *agent) createCommand(ctx context.Context, rawCommand string, env []stri
 	if err != nil {
 		return nil, xerrors.Errorf("getting os executable: %w", err)
 	}
+	cmd.Env = append(cmd.Env, fmt.Sprintf("USER=%s", username))
+	cmd.Env = append(cmd.Env, fmt.Sprintf(`PATH=%s%c%s`, os.Getenv("PATH"), filepath.ListSeparator, filepath.Dir(executablePath)))
 	// Git on Windows resolves with UNIX-style paths.
 	// If using backslashes, it's unable to find the executable.
-	executablePath = strings.ReplaceAll(executablePath, "\\", "/")
-	cmd.Env = append(cmd.Env, fmt.Sprintf(`GIT_SSH_COMMAND=%s gitssh --`, executablePath))
+	unixExecutablePath := strings.ReplaceAll(executablePath, "\\", "/")
+	cmd.Env = append(cmd.Env, fmt.Sprintf(`GIT_SSH_COMMAND=%s gitssh --`, unixExecutablePath))
 	// These prevent the user from having to specify _anything_ to successfully commit.
 	// Both author and committer must be set!
 	cmd.Env = append(cmd.Env, fmt.Sprintf(`GIT_AUTHOR_EMAIL=%s`, metadata.OwnerEmail))
@@ -375,6 +391,16 @@ func (a *agent) handleSSHSession(session ssh.Session) error {
 	cmd, err := a.createCommand(session.Context(), session.RawCommand(), session.Environ())
 	if err != nil {
 		return err
+	}
+
+	if ssh.AgentRequested(session) {
+		l, err := ssh.NewAgentListener()
+		if err != nil {
+			return xerrors.Errorf("new agent listener: %w", err)
+		}
+		defer l.Close()
+		go ssh.ForwardAgentConnections(l, session)
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "SSH_AUTH_SOCK", l.Addr().String()))
 	}
 
 	sshPty, windowSize, isPty := session.Pty()
@@ -475,8 +501,8 @@ func (a *agent) handleReconnectingPTY(ctx context.Context, rawID string, conn ne
 			a.logger.Warn(ctx, "start reconnecting pty command", slog.F("id", id))
 		}
 
-		// Default to buffer 64KB.
-		circularBuffer, err := circbuf.NewBuffer(64 * 1024)
+		// Default to buffer 64KiB.
+		circularBuffer, err := circbuf.NewBuffer(64 << 10)
 		if err != nil {
 			a.logger.Warn(ctx, "create circular buffer", slog.Error(err))
 			return
@@ -617,6 +643,70 @@ func (a *agent) handleReconnectingPTY(ctx context.Context, rawID string, conn ne
 	}
 }
 
+// dialResponse is written to datachannels with protocol "dial" by the agent as
+// the first packet to signify whether the dial succeeded or failed.
+type dialResponse struct {
+	Error string `json:"error,omitempty"`
+}
+
+func (a *agent) handleDial(ctx context.Context, label string, conn net.Conn) {
+	defer conn.Close()
+
+	writeError := func(responseError error) error {
+		msg := ""
+		if responseError != nil {
+			msg = responseError.Error()
+			if !xerrors.Is(responseError, io.EOF) {
+				a.logger.Warn(ctx, "handle dial", slog.F("label", label), slog.Error(responseError))
+			}
+		}
+		b, err := json.Marshal(dialResponse{
+			Error: msg,
+		})
+		if err != nil {
+			a.logger.Warn(ctx, "write dial response", slog.F("label", label), slog.Error(err))
+			return xerrors.Errorf("marshal agent webrtc dial response: %w", err)
+		}
+
+		_, err = conn.Write(b)
+		return err
+	}
+
+	u, err := url.Parse(label)
+	if err != nil {
+		_ = writeError(xerrors.Errorf("parse URL %q: %w", label, err))
+		return
+	}
+
+	network := u.Scheme
+	addr := u.Host + u.Path
+	if strings.HasPrefix(network, "unix") {
+		if runtime.GOOS == "windows" {
+			_ = writeError(xerrors.New("Unix forwarding is not supported from Windows workspaces"))
+			return
+		}
+		addr, err = ExpandRelativeHomePath(addr)
+		if err != nil {
+			_ = writeError(xerrors.Errorf("expand path %q: %w", addr, err))
+			return
+		}
+	}
+
+	d := net.Dialer{Timeout: 3 * time.Second}
+	nconn, err := d.DialContext(ctx, network, addr)
+	if err != nil {
+		_ = writeError(xerrors.Errorf("dial '%v://%v': %w", network, addr, err))
+		return
+	}
+
+	err = writeError(nil)
+	if err != nil {
+		return
+	}
+
+	Bicopy(ctx, conn, nconn)
+}
+
 // isClosed returns whether the API is closed or not.
 func (a *agent) isClosed() bool {
 	select {
@@ -661,4 +751,51 @@ func (r *reconnectingPTY) Close() {
 	_ = r.ptty.Close()
 	r.circularBuffer.Reset()
 	r.timeout.Stop()
+}
+
+// Bicopy copies all of the data between the two connections and will close them
+// after one or both of them are done writing. If the context is canceled, both
+// of the connections will be closed.
+func Bicopy(ctx context.Context, c1, c2 io.ReadWriteCloser) {
+	defer c1.Close()
+	defer c2.Close()
+
+	var wg sync.WaitGroup
+	copyFunc := func(dst io.WriteCloser, src io.Reader) {
+		defer wg.Done()
+		_, _ = io.Copy(dst, src)
+	}
+
+	wg.Add(2)
+	go copyFunc(c1, c2)
+	go copyFunc(c2, c1)
+
+	// Convert waitgroup to a channel so we can also wait on the context.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+
+	select {
+	case <-ctx.Done():
+	case <-done:
+	}
+}
+
+// ExpandRelativeHomePath expands the tilde at the beginning of a path to the
+// current user's home directory and returns a full absolute path.
+func ExpandRelativeHomePath(in string) (string, error) {
+	usr, err := user.Current()
+	if err != nil {
+		return "", xerrors.Errorf("get current user details: %w", err)
+	}
+
+	if in == "~" {
+		in = usr.HomeDir
+	} else if strings.HasPrefix(in, "~/") {
+		in = filepath.Join(usr.HomeDir, in[2:])
+	}
+
+	return filepath.Abs(in)
 }
