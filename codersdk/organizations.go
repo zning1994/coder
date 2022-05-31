@@ -61,6 +61,10 @@ type CreateTemplateRequest struct {
 	// templates, but it doesn't make sense for users.
 	VersionID       uuid.UUID                `json:"template_version_id" validate:"required"`
 	ParameterValues []CreateParameterRequest `json:"parameter_values,omitempty"`
+
+	// MaxTTL (Optional) controls the maximum Time-To-Live (TTL) value of all workspaces
+	// provisioned from this template.
+	MaxTTL *time.Duration `json:"max_ttl"`
 }
 
 // CreateWorkspaceRequest provides options for creating a new workspace.

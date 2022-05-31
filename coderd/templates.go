@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -135,6 +136,11 @@ func (api *API) postTemplateByOrganization(rw http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	maxTTL := 24 * 7 * time.Hour
+	if createTemplate.MaxTTL != nil {
+		maxTTL = *createTemplate.MaxTTL
+	}
+
 	var template codersdk.Template
 	err = api.Database.InTx(func(db database.Store) error {
 		now := database.Now()
@@ -147,6 +153,7 @@ func (api *API) postTemplateByOrganization(rw http.ResponseWriter, r *http.Reque
 			Provisioner:     importJob.Provisioner,
 			ActiveVersionID: templateVersion.ID,
 			Description:     createTemplate.Description,
+			MaxTtl:          int64(maxTTL),
 		})
 		if err != nil {
 			return xerrors.Errorf("insert template: %s", err)
@@ -304,5 +311,6 @@ func convertTemplate(template database.Template, workspaceOwnerCount uint32) cod
 		ActiveVersionID:     template.ActiveVersionID,
 		WorkspaceOwnerCount: workspaceOwnerCount,
 		Description:         template.Description,
+		MaxTTL:              time.Duration(template.MaxTtl),
 	}
 }

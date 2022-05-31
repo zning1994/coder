@@ -1592,7 +1592,7 @@ func (q *sqlQuerier) UpdateProvisionerJobWithCompleteByID(ctx context.Context, a
 
 const getTemplateByID = `-- name: GetTemplateByID :one
 SELECT
-	id, created_at, updated_at, organization_id, deleted, name, provisioner, active_version_id, description
+	id, created_at, updated_at, organization_id, deleted, name, provisioner, active_version_id, description, max_ttl
 FROM
 	templates
 WHERE
@@ -1614,13 +1614,14 @@ func (q *sqlQuerier) GetTemplateByID(ctx context.Context, id uuid.UUID) (Templat
 		&i.Provisioner,
 		&i.ActiveVersionID,
 		&i.Description,
+		&i.MaxTtl,
 	)
 	return i, err
 }
 
 const getTemplateByOrganizationAndName = `-- name: GetTemplateByOrganizationAndName :one
 SELECT
-	id, created_at, updated_at, organization_id, deleted, name, provisioner, active_version_id, description
+	id, created_at, updated_at, organization_id, deleted, name, provisioner, active_version_id, description, max_ttl
 FROM
 	templates
 WHERE
@@ -1650,13 +1651,14 @@ func (q *sqlQuerier) GetTemplateByOrganizationAndName(ctx context.Context, arg G
 		&i.Provisioner,
 		&i.ActiveVersionID,
 		&i.Description,
+		&i.MaxTtl,
 	)
 	return i, err
 }
 
 const getTemplatesByIDs = `-- name: GetTemplatesByIDs :many
 SELECT
-	id, created_at, updated_at, organization_id, deleted, name, provisioner, active_version_id, description
+	id, created_at, updated_at, organization_id, deleted, name, provisioner, active_version_id, description, max_ttl
 FROM
 	templates
 WHERE
@@ -1682,6 +1684,7 @@ func (q *sqlQuerier) GetTemplatesByIDs(ctx context.Context, ids []uuid.UUID) ([]
 			&i.Provisioner,
 			&i.ActiveVersionID,
 			&i.Description,
+			&i.MaxTtl,
 		); err != nil {
 			return nil, err
 		}
@@ -1698,7 +1701,7 @@ func (q *sqlQuerier) GetTemplatesByIDs(ctx context.Context, ids []uuid.UUID) ([]
 
 const getTemplatesByOrganization = `-- name: GetTemplatesByOrganization :many
 SELECT
-	id, created_at, updated_at, organization_id, deleted, name, provisioner, active_version_id, description
+	id, created_at, updated_at, organization_id, deleted, name, provisioner, active_version_id, description, max_ttl
 FROM
 	templates
 WHERE
@@ -1730,6 +1733,7 @@ func (q *sqlQuerier) GetTemplatesByOrganization(ctx context.Context, arg GetTemp
 			&i.Provisioner,
 			&i.ActiveVersionID,
 			&i.Description,
+			&i.MaxTtl,
 		); err != nil {
 			return nil, err
 		}
@@ -1754,10 +1758,11 @@ INSERT INTO
 		"name",
 		provisioner,
 		active_version_id,
-		description
+		description,
+        max_ttl
 	)
 VALUES
-	($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at, organization_id, deleted, name, provisioner, active_version_id, description
+	($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at, updated_at, organization_id, deleted, name, provisioner, active_version_id, description, max_ttl
 `
 
 type InsertTemplateParams struct {
@@ -1769,6 +1774,7 @@ type InsertTemplateParams struct {
 	Provisioner     ProvisionerType `db:"provisioner" json:"provisioner"`
 	ActiveVersionID uuid.UUID       `db:"active_version_id" json:"active_version_id"`
 	Description     string          `db:"description" json:"description"`
+	MaxTtl          int64           `db:"max_ttl" json:"max_ttl"`
 }
 
 func (q *sqlQuerier) InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error) {
@@ -1781,6 +1787,7 @@ func (q *sqlQuerier) InsertTemplate(ctx context.Context, arg InsertTemplateParam
 		arg.Provisioner,
 		arg.ActiveVersionID,
 		arg.Description,
+		arg.MaxTtl,
 	)
 	var i Template
 	err := row.Scan(
@@ -1793,6 +1800,7 @@ func (q *sqlQuerier) InsertTemplate(ctx context.Context, arg InsertTemplateParam
 		&i.Provisioner,
 		&i.ActiveVersionID,
 		&i.Description,
+		&i.MaxTtl,
 	)
 	return i, err
 }

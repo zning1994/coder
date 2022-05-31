@@ -22,6 +22,7 @@ type Template struct {
 	ActiveVersionID     uuid.UUID       `json:"active_version_id"`
 	WorkspaceOwnerCount uint32          `json:"workspace_owner_count"`
 	Description         string          `json:"description"`
+	MaxTTL              time.Duration   `json:"max_ttl"`
 }
 
 type UpdateActiveTemplateVersion struct {

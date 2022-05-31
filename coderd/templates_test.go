@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -35,13 +36,16 @@ func TestPostTemplateByOrganization(t *testing.T) {
 		user := coderdtest.CreateFirstUser(t, client)
 		version := coderdtest.CreateTemplateVersion(t, client, user.OrganizationID, nil)
 
-		expected := coderdtest.CreateTemplate(t, client, user.OrganizationID, version.ID)
+		expected := coderdtest.CreateTemplate(t, client, user.OrganizationID, version.ID, func(ctr *codersdk.CreateTemplateRequest) {
+			ctr.MaxTTL = ptr(12 * time.Hour)
+		})
 
 		got, err := client.Template(context.Background(), expected.ID)
 		require.NoError(t, err)
 
 		assert.Equal(t, expected.Name, got.Name)
 		assert.Equal(t, expected.Description, got.Description)
+		assert.Equal(t, 12*time.Hour, got.MaxTTL)
 	})
 
 	t.Run("AlreadyExists", func(t *testing.T) {
