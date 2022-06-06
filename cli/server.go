@@ -21,6 +21,7 @@ import (
 
 	"github.com/coder/coder/buildinfo"
 	"github.com/coder/coder/provisioner/echo"
+	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 
 	"github.com/briandowns/spinner"
 	"github.com/coreos/go-systemd/daemon"
@@ -258,6 +259,37 @@ func server() *cobra.Command {
 
 			if !dev {
 				sqlDB, err := sql.Open(sqlDriver, postgresURL)
+				if err != nil {
+					return xerrors.Errorf("dial postgres: %w", err)
+				}
+				err = sqlDB.Ping()
+				if err != nil {
+					return xerrors.Errorf("ping postgres: %w", err)
+				}
+				err = database.MigrateUp(sqlDB)
+				if err != nil {
+					return xerrors.Errorf("migrate up: %w", err)
+				}
+				options.Database = database.New(sqlDB)
+				options.Pubsub, err = database.NewPubsub(cmd.Context(), sqlDB, postgresURL)
+				if err != nil {
+					return xerrors.Errorf("create pubsub: %w", err)
+				}
+			} else {
+				postgres := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().
+					Username("coder").
+					Password("password").
+					DataPath("coder"),
+				)
+				err = postgres.Start()
+				if err != nil {
+					return xerrors.Errorf("create pubsub: %w", err)
+				}
+				defer func() {
+					_ = postgres.Stop()
+				}()
+
+				sqlDB, err := sql.Open(sqlDriver, "postgres://coder@localhost:5432/coder?password=password&sslmode=allow")
 				if err != nil {
 					return xerrors.Errorf("dial postgres: %w", err)
 				}

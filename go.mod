@@ -128,7 +128,9 @@ require (
 
 require (
 	github.com/agnivade/levenshtein v1.0.1 // indirect
+	github.com/fergusstrange/embedded-postgres v1.15.0 // indirect
 	github.com/vektah/gqlparser/v2 v2.4.4 // indirect
+	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yuin/goldmark v1.4.12 // indirect
 )
 
