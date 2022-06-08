@@ -476,63 +476,63 @@ func (q *fakeQuerier) GetWorkspaceOwnerCountsByTemplateIDs(_ context.Context, te
 	return res, nil
 }
 
-func (q *fakeQuerier) GetWorkspaceBuildByID(_ context.Context, id uuid.UUID) (database.WorkspaceBuildWithInitiator, error) {
+func (q *fakeQuerier) GetWorkspaceBuildByID(_ context.Context, id uuid.UUID) (database.WorkspaceBuildWithName, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
 	for _, history := range q.workspaceBuilds {
 		if history.ID.String() == id.String() {
-			return q.workspaceBuildWithInitiator(history), nil
+			return q.WorkspaceBuildWithName(history), nil
 		}
 	}
-	return database.WorkspaceBuildWithInitiator{}, sql.ErrNoRows
+	return database.WorkspaceBuildWithName{}, sql.ErrNoRows
 }
 
-func (q *fakeQuerier) GetWorkspaceBuildByJobID(_ context.Context, jobID uuid.UUID) (database.WorkspaceBuildWithInitiator, error) {
+func (q *fakeQuerier) GetWorkspaceBuildByJobID(_ context.Context, jobID uuid.UUID) (database.WorkspaceBuildWithName, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
 	for _, build := range q.workspaceBuilds {
 		if build.JobID.String() == jobID.String() {
-			return q.workspaceBuildWithInitiator(build), nil
+			return q.WorkspaceBuildWithName(build), nil
 		}
 	}
-	return database.WorkspaceBuildWithInitiator{}, sql.ErrNoRows
+	return database.WorkspaceBuildWithName{}, sql.ErrNoRows
 }
 
-func (q *fakeQuerier) GetLatestWorkspaceBuildByWorkspaceID(_ context.Context, workspaceID uuid.UUID) (database.WorkspaceBuildWithInitiator, error) {
+func (q *fakeQuerier) GetLatestWorkspaceBuildByWorkspaceID(_ context.Context, workspaceID uuid.UUID) (database.WorkspaceBuildWithName, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
-	var row database.WorkspaceBuildWithInitiator
+	var row database.WorkspaceBuildWithName
 	var buildNum int32
 	for _, workspaceBuild := range q.workspaceBuilds {
 		if workspaceBuild.WorkspaceID.String() == workspaceID.String() && workspaceBuild.BuildNumber > buildNum {
-			row = q.workspaceBuildWithInitiator(workspaceBuild)
+			row = q.WorkspaceBuildWithName(workspaceBuild)
 			buildNum = workspaceBuild.BuildNumber
 		}
 	}
 	if buildNum == 0 {
-		return database.WorkspaceBuildWithInitiator{}, sql.ErrNoRows
+		return database.WorkspaceBuildWithName{}, sql.ErrNoRows
 	}
 	return row, nil
 }
 
-func (q *fakeQuerier) GetLatestWorkspaceBuildsByWorkspaceIDs(_ context.Context, ids []uuid.UUID) ([]database.WorkspaceBuildWithInitiator, error) {
+func (q *fakeQuerier) GetLatestWorkspaceBuildsByWorkspaceIDs(_ context.Context, ids []uuid.UUID) ([]database.WorkspaceBuildWithName, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
-	builds := make(map[uuid.UUID]database.WorkspaceBuildWithInitiator)
+	builds := make(map[uuid.UUID]database.WorkspaceBuildWithName)
 	buildNumbers := make(map[uuid.UUID]int32)
 	for _, workspaceBuild := range q.workspaceBuilds {
 		for _, id := range ids {
 			if id.String() == workspaceBuild.WorkspaceID.String() && workspaceBuild.BuildNumber > buildNumbers[id] {
-				builds[id] = q.workspaceBuildWithInitiator(workspaceBuild)
+				builds[id] = q.WorkspaceBuildWithName(workspaceBuild)
 				buildNumbers[id] = workspaceBuild.BuildNumber
 			}
 		}
 	}
-	var returnBuilds []database.WorkspaceBuildWithInitiator
+	var returnBuilds []database.WorkspaceBuildWithName
 	for i, n := range buildNumbers {
 		if n > 0 {
 			b := builds[i]
@@ -546,19 +546,19 @@ func (q *fakeQuerier) GetLatestWorkspaceBuildsByWorkspaceIDs(_ context.Context, 
 }
 
 func (q *fakeQuerier) GetWorkspaceBuildByWorkspaceID(_ context.Context,
-	params database.GetWorkspaceBuildByWorkspaceIDParams) ([]database.WorkspaceBuildWithInitiator, error) {
+	params database.GetWorkspaceBuildByWorkspaceIDParams) ([]database.WorkspaceBuildWithName, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
-	history := make([]database.WorkspaceBuildWithInitiator, 0)
+	history := make([]database.WorkspaceBuildWithName, 0)
 	for _, workspaceBuild := range q.workspaceBuilds {
 		if workspaceBuild.WorkspaceID.String() == params.WorkspaceID.String() {
-			history = append(history, q.workspaceBuildWithInitiator(workspaceBuild))
+			history = append(history, q.WorkspaceBuildWithName(workspaceBuild))
 		}
 	}
 
 	// Order by build_number
-	slices.SortFunc(history, func(a, b database.WorkspaceBuildWithInitiator) bool {
+	slices.SortFunc(history, func(a, b database.WorkspaceBuildWithName) bool {
 		// use greater than since we want descending order
 		return a.BuildNumber > b.BuildNumber
 	})
@@ -600,7 +600,7 @@ func (q *fakeQuerier) GetWorkspaceBuildByWorkspaceID(_ context.Context,
 	return history, nil
 }
 
-func (q *fakeQuerier) GetWorkspaceBuildByWorkspaceIDAndName(_ context.Context, arg database.GetWorkspaceBuildByWorkspaceIDAndNameParams) (database.WorkspaceBuildWithInitiator, error) {
+func (q *fakeQuerier) GetWorkspaceBuildByWorkspaceIDAndName(_ context.Context, arg database.GetWorkspaceBuildByWorkspaceIDAndNameParams) (database.WorkspaceBuildWithName, error) {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
@@ -612,18 +612,19 @@ func (q *fakeQuerier) GetWorkspaceBuildByWorkspaceIDAndName(_ context.Context, a
 			continue
 		}
 
-		return q.workspaceBuildWithInitiator(workspaceBuild), nil
+		return q.WorkspaceBuildWithName(workspaceBuild), nil
 	}
-	return database.WorkspaceBuildWithInitiator{}, sql.ErrNoRows
+	return database.WorkspaceBuildWithName{}, sql.ErrNoRows
 }
 
-func (q *fakeQuerier) workspaceBuildWithInitiator(build database.WorkspaceBuild) database.WorkspaceBuildWithInitiator {
-	username := "unknown"
-	usr, err := q.GetUserByID(context.Background(), build.InitiatorID)
-	if err == nil {
-		username = usr.Username
-	}
-	return database.WorkspaceBuildWithInitiator{
+func (q *fakeQuerier) WorkspaceBuildWithName(build database.WorkspaceBuild) database.WorkspaceBuildWithName {
+	initiator := q.joinedUserOrZero(build.InitiatorID)
+	workspace := q.joinedWorkspaceOrZero(build.WorkspaceID)
+	owner := q.joinedUserOrZero(workspace.OwnerID)
+	template := q.joinedTemplateOrZero(workspace.TemplateID)
+
+	return database.WorkspaceBuildWithName{
+		// workspace_build.*
 		ID:                build.ID,
 		CreatedAt:         build.CreatedAt,
 		UpdatedAt:         build.UpdatedAt,
@@ -636,8 +637,62 @@ func (q *fakeQuerier) workspaceBuildWithInitiator(build database.WorkspaceBuild)
 		ProvisionerState:  build.ProvisionerState,
 		JobID:             build.JobID,
 		Deadline:          build.Deadline,
-		InitiatorUsername: username,
+
+		// Joined
+		InitiatorUsername:     initiator.Username,
+		OwnerID:               owner.ID,
+		OwnerName:             owner.Username,
+		WorkspaceName:         workspace.Name,
+		TemplateID:            workspace.TemplateID,
+		TemplateName:          template.Name,
+		TemplateActiveVersion: template.ActiveVersionID,
 	}
+}
+
+func (q *fakeQuerier) joinedTemplateOrZero(templateID uuid.UUID) database.Template {
+	template, err := q.GetTemplateByID(context.Background(), templateID)
+	if err != nil {
+		// Return fields that can be used in the join with basic defaults.
+		return database.Template{
+			ID:              uuid.Nil,
+			OrganizationID:  uuid.Nil,
+			Name:            "unknown",
+			Provisioner:     "unknown",
+			ActiveVersionID: uuid.Nil,
+		}
+	}
+	return template
+}
+
+func (q *fakeQuerier) joinedWorkspaceOrZero(workspaceID uuid.UUID) database.Workspace {
+	user, err := q.GetWorkspaceByID(context.Background(), workspaceID)
+	if err != nil {
+		// Return fields that can be used in the join with basic defaults.
+		return database.Workspace{
+			ID:             uuid.Nil,
+			OwnerID:        uuid.Nil,
+			OrganizationID: uuid.Nil,
+			TemplateID:     uuid.Nil,
+			Deleted:        false,
+			Name:           "unknown",
+		}
+	}
+	return user
+}
+
+func (q *fakeQuerier) joinedUserOrZero(userID uuid.UUID) database.User {
+	user, err := q.GetUserByID(context.Background(), userID)
+	if err != nil {
+		// Return fields that can be used in the join with basic defaults.
+		return database.User{
+			ID:        uuid.Nil,
+			Email:     "unknown",
+			Username:  "unknown",
+			Status:    "unknown",
+			RBACRoles: []string{},
+		}
+	}
+	return user
 }
 
 func (q *fakeQuerier) GetWorkspacesByOrganizationIDs(_ context.Context, req database.GetWorkspacesByOrganizationIDsParams) ([]database.Workspace, error) {

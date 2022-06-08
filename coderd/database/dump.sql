@@ -308,32 +308,6 @@ CREATE TABLE workspace_builds (
     deadline timestamp with time zone DEFAULT '0001-01-01 00:00:00+00'::timestamp with time zone NOT NULL
 );
 
-CREATE VIEW workspace_build_with_initiator AS
- SELECT workspace_builds.id,
-    workspace_builds.created_at,
-    workspace_builds.updated_at,
-    workspace_builds.workspace_id,
-    workspace_builds.template_version_id,
-    workspace_builds.name,
-    workspace_builds.build_number,
-    workspace_builds.transition,
-    workspace_builds.initiator_id,
-    workspace_builds.provisioner_state,
-    workspace_builds.job_id,
-    workspace_builds.deadline,
-    COALESCE(users.username, 'unknown'::text) AS initiator_username
-   FROM (public.workspace_builds
-     LEFT JOIN users ON ((workspace_builds.initiator_id = users.id)));
-
-CREATE TABLE workspace_resources (
-    id uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    job_id uuid NOT NULL,
-    transition workspace_transition NOT NULL,
-    type character varying(192) NOT NULL,
-    name character varying(64) NOT NULL
-);
-
 CREATE TABLE workspaces (
     id uuid NOT NULL,
     created_at timestamp with time zone NOT NULL,
@@ -345,6 +319,41 @@ CREATE TABLE workspaces (
     name character varying(64) NOT NULL,
     autostart_schedule text,
     ttl bigint
+);
+
+CREATE VIEW workspace_build_with_names AS
+ SELECT COALESCE(initiator_user.username, 'unknown'::text) AS initiator_username,
+    COALESCE(workspaces.owner_id, '00000000-0000-0000-0000-000000000000'::uuid) AS owner_id,
+    COALESCE(owner_user.username, 'unknown'::text) AS owner_name,
+    COALESCE(workspaces.name, 'unknown'::character varying) AS workspace_name,
+    COALESCE(templates.id, '00000000-0000-0000-0000-000000000000'::uuid) AS template_id,
+    COALESCE(templates.name, 'unknown'::character varying) AS template_name,
+    COALESCE(templates.active_version_id, '00000000-0000-0000-0000-000000000000'::uuid) AS template_active_version,
+    workspace_builds.id,
+    workspace_builds.created_at,
+    workspace_builds.updated_at,
+    workspace_builds.workspace_id,
+    workspace_builds.template_version_id,
+    workspace_builds.name,
+    workspace_builds.build_number,
+    workspace_builds.transition,
+    workspace_builds.initiator_id,
+    workspace_builds.provisioner_state,
+    workspace_builds.job_id,
+    workspace_builds.deadline
+   FROM ((((public.workspace_builds
+     LEFT JOIN users initiator_user ON ((workspace_builds.initiator_id = initiator_user.id)))
+     LEFT JOIN workspaces ON ((workspaces.id = workspace_builds.workspace_id)))
+     LEFT JOIN users owner_user ON ((workspaces.owner_id = owner_user.id)))
+     LEFT JOIN templates ON ((workspaces.template_id = templates.id)));
+
+CREATE TABLE workspace_resources (
+    id uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    job_id uuid NOT NULL,
+    transition workspace_transition NOT NULL,
+    type character varying(192) NOT NULL,
+    name character varying(64) NOT NULL
 );
 
 ALTER TABLE ONLY licenses ALTER COLUMN id SET DEFAULT nextval('public.licenses_id_seq'::regclass);

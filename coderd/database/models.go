@@ -521,20 +521,26 @@ type WorkspaceBuild struct {
 	Deadline          time.Time           `db:"deadline" json:"deadline"`
 }
 
-type WorkspaceBuildWithInitiator struct {
-	ID                uuid.UUID           `db:"id" json:"id"`
-	CreatedAt         time.Time           `db:"created_at" json:"created_at"`
-	UpdatedAt         time.Time           `db:"updated_at" json:"updated_at"`
-	WorkspaceID       uuid.UUID           `db:"workspace_id" json:"workspace_id"`
-	TemplateVersionID uuid.UUID           `db:"template_version_id" json:"template_version_id"`
-	Name              string              `db:"name" json:"name"`
-	BuildNumber       int32               `db:"build_number" json:"build_number"`
-	Transition        WorkspaceTransition `db:"transition" json:"transition"`
-	InitiatorID       uuid.UUID           `db:"initiator_id" json:"initiator_id"`
-	ProvisionerState  []byte              `db:"provisioner_state" json:"provisioner_state"`
-	JobID             uuid.UUID           `db:"job_id" json:"job_id"`
-	Deadline          time.Time           `db:"deadline" json:"deadline"`
-	InitiatorUsername string              `db:"initiator_username" json:"initiator_username"`
+type WorkspaceBuildWithName struct {
+	InitiatorUsername     string              `db:"initiator_username" json:"initiator_username"`
+	OwnerID               uuid.UUID           `db:"owner_id" json:"owner_id"`
+	OwnerName             string              `db:"owner_name" json:"owner_name"`
+	WorkspaceName         string              `db:"workspace_name" json:"workspace_name"`
+	TemplateID            uuid.UUID           `db:"template_id" json:"template_id"`
+	TemplateName          string              `db:"template_name" json:"template_name"`
+	TemplateActiveVersion uuid.UUID           `db:"template_active_version" json:"template_active_version"`
+	ID                    uuid.UUID           `db:"id" json:"id"`
+	CreatedAt             time.Time           `db:"created_at" json:"created_at"`
+	UpdatedAt             time.Time           `db:"updated_at" json:"updated_at"`
+	WorkspaceID           uuid.UUID           `db:"workspace_id" json:"workspace_id"`
+	TemplateVersionID     uuid.UUID           `db:"template_version_id" json:"template_version_id"`
+	Name                  string              `db:"name" json:"name"`
+	BuildNumber           int32               `db:"build_number" json:"build_number"`
+	Transition            WorkspaceTransition `db:"transition" json:"transition"`
+	InitiatorID           uuid.UUID           `db:"initiator_id" json:"initiator_id"`
+	ProvisionerState      []byte              `db:"provisioner_state" json:"provisioner_state"`
+	JobID                 uuid.UUID           `db:"job_id" json:"job_id"`
+	Deadline              time.Time           `db:"deadline" json:"deadline"`
 }
 
 type WorkspaceResource struct {

@@ -70,21 +70,11 @@ func (api *API) workspace(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var (
-		group    errgroup.Group
-		job      database.ProvisionerJob
-		template database.Template
-		owner    database.User
+		group errgroup.Group
+		job   database.ProvisionerJob
 	)
 	group.Go(func() (err error) {
 		job, err = api.Database.GetProvisionerJobByID(r.Context(), build.JobID)
-		return err
-	})
-	group.Go(func() (err error) {
-		template, err = api.Database.GetTemplateByID(r.Context(), workspace.TemplateID)
-		return err
-	})
-	group.Go(func() (err error) {
-		owner, err = api.Database.GetUserByID(r.Context(), workspace.OwnerID)
 		return err
 	})
 	err = group.Wait()
@@ -96,7 +86,7 @@ func (api *API) workspace(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpapi.Write(rw, http.StatusOK, convertWorkspace(workspace, build, job, template, owner))
+	httpapi.Write(rw, http.StatusOK, convertWorkspace(workspace, build, job))
 }
 
 // workspaces returns all workspaces a user can read.
@@ -201,16 +191,8 @@ func (api *API) workspaceByOwnerAndName(rw http.ResponseWriter, r *http.Request)
 		})
 		return
 	}
-	template, err := api.Database.GetTemplateByID(r.Context(), workspace.TemplateID)
-	if err != nil {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: "Internal error fetching template.",
-			Detail:  err.Error(),
-		})
-		return
-	}
 
-	httpapi.Write(rw, http.StatusOK, convertWorkspace(workspace, build, job, template, owner))
+	httpapi.Write(rw, http.StatusOK, convertWorkspace(workspace, build, job))
 }
 
 // Create a new workspace for the currently authenticated user.
@@ -361,7 +343,7 @@ func (api *API) postWorkspacesByOrganization(rw http.ResponseWriter, r *http.Req
 	}
 
 	var provisionerJob database.ProvisionerJob
-	var workspaceBuild database.WorkspaceBuildWithInitiator
+	var workspaceBuild database.WorkspaceBuildWithName
 	err = api.Database.InTx(func(db database.Store) error {
 		now := database.Now()
 		workspaceBuildID := uuid.New()
@@ -448,16 +430,8 @@ func (api *API) postWorkspacesByOrganization(rw http.ResponseWriter, r *http.Req
 		})
 		return
 	}
-	user, err := api.Database.GetUserByID(r.Context(), apiKey.UserID)
-	if err != nil {
-		httpapi.Write(rw, http.StatusInternalServerError, httpapi.Response{
-			Message: "Internal error fetching user.",
-			Detail:  err.Error(),
-		})
-		return
-	}
 
-	httpapi.Write(rw, http.StatusCreated, convertWorkspace(workspace, workspaceBuild, templateVersionJob, template, user))
+	httpapi.Write(rw, http.StatusCreated, convertWorkspace(workspace, workspaceBuild, templateVersionJob))
 }
 
 func (api *API) putWorkspaceAutostart(rw http.ResponseWriter, r *http.Request) {
@@ -671,21 +645,11 @@ func (api *API) watchWorkspace(rw http.ResponseWriter, r *http.Request) {
 				return
 			}
 			var (
-				group    errgroup.Group
-				job      database.ProvisionerJob
-				template database.Template
-				owner    database.User
+				group errgroup.Group
+				job   database.ProvisionerJob
 			)
 			group.Go(func() (err error) {
 				job, err = api.Database.GetProvisionerJobByID(r.Context(), build.JobID)
-				return err
-			})
-			group.Go(func() (err error) {
-				template, err = api.Database.GetTemplateByID(r.Context(), workspace.TemplateID)
-				return err
-			})
-			group.Go(func() (err error) {
-				owner, err = api.Database.GetUserByID(r.Context(), workspace.OwnerID)
 				return err
 			})
 			err = group.Wait()
@@ -697,7 +661,7 @@ func (api *API) watchWorkspace(rw http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			_ = wsjson.Write(ctx, c, convertWorkspace(workspace, build, job, template, owner))
+			_ = wsjson.Write(ctx, c, convertWorkspace(workspace, build, job))
 		case <-ctx.Done():
 			return
 		}
@@ -720,17 +684,6 @@ func convertWorkspaces(ctx context.Context, db database.Store, workspaces []data
 	if err != nil {
 		return nil, xerrors.Errorf("get workspace builds: %w", err)
 	}
-	templates, err := db.GetTemplatesByIDs(ctx, templateIDs)
-	if errors.Is(err, sql.ErrNoRows) {
-		err = nil
-	}
-	if err != nil {
-		return nil, xerrors.Errorf("get templates: %w", err)
-	}
-	users, err := db.GetUsersByIDs(ctx, ownerIDs)
-	if err != nil {
-		return nil, xerrors.Errorf("get users: %w", err)
-	}
 	jobIDs := make([]uuid.UUID, 0, len(workspaceBuilds))
 	for _, build := range workspaceBuilds {
 		jobIDs = append(jobIDs, build.JobID)
@@ -743,9 +696,9 @@ func convertWorkspaces(ctx context.Context, db database.Store, workspaces []data
 		return nil, xerrors.Errorf("get provisioner jobs: %w", err)
 	}
 
-	buildByWorkspaceID := map[uuid.UUID]database.WorkspaceBuildWithInitiator{}
+	buildByWorkspaceID := map[uuid.UUID]database.WorkspaceBuildWithName{}
 	for _, workspaceBuild := range workspaceBuilds {
-		buildByWorkspaceID[workspaceBuild.WorkspaceID] = database.WorkspaceBuildWithInitiator{
+		buildByWorkspaceID[workspaceBuild.WorkspaceID] = database.WorkspaceBuildWithName{
 			ID:                workspaceBuild.ID,
 			CreatedAt:         workspaceBuild.CreatedAt,
 			UpdatedAt:         workspaceBuild.UpdatedAt,
@@ -761,14 +714,6 @@ func convertWorkspaces(ctx context.Context, db database.Store, workspaces []data
 			InitiatorUsername: workspaceBuild.InitiatorUsername,
 		}
 	}
-	templateByID := map[uuid.UUID]database.Template{}
-	for _, template := range templates {
-		templateByID[template.ID] = template
-	}
-	userByID := map[uuid.UUID]database.User{}
-	for _, user := range users {
-		userByID[user.ID] = user
-	}
 	jobByID := map[uuid.UUID]database.ProvisionerJob{}
 	for _, job := range jobs {
 		jobByID[job.ID] = job
@@ -779,28 +724,18 @@ func convertWorkspaces(ctx context.Context, db database.Store, workspaces []data
 		if !exists {
 			return nil, xerrors.Errorf("build not found for workspace %q", workspace.Name)
 		}
-		template, exists := templateByID[workspace.TemplateID]
-		if !exists {
-			return nil, xerrors.Errorf("template not found for workspace %q", workspace.Name)
-		}
 		job, exists := jobByID[build.JobID]
 		if !exists {
 			return nil, xerrors.Errorf("build job not found for workspace: %w", err)
 		}
-		user, exists := userByID[workspace.OwnerID]
-		if !exists {
-			return nil, xerrors.Errorf("owner not found for workspace: %q", workspace.Name)
-		}
-		apiWorkspaces = append(apiWorkspaces, convertWorkspace(workspace, build, job, template, user))
+		apiWorkspaces = append(apiWorkspaces, convertWorkspace(workspace, build, job))
 	}
 	return apiWorkspaces, nil
 }
 func convertWorkspace(
 	workspace database.Workspace,
-	workspaceBuild database.WorkspaceBuildWithInitiator,
-	job database.ProvisionerJob,
-	template database.Template,
-	owner database.User) codersdk.Workspace {
+	workspaceBuild database.WorkspaceBuildWithName,
+	job database.ProvisionerJob) codersdk.Workspace {
 	var autostartSchedule *string
 	if workspace.AutostartSchedule.Valid {
 		autostartSchedule = &workspace.AutostartSchedule.String
@@ -812,11 +747,11 @@ func convertWorkspace(
 		CreatedAt:         workspace.CreatedAt,
 		UpdatedAt:         workspace.UpdatedAt,
 		OwnerID:           workspace.OwnerID,
-		OwnerName:         owner.Username,
-		TemplateID:        workspace.TemplateID,
-		LatestBuild:       convertWorkspaceBuild(owner, workspace, workspaceBuild, job),
-		TemplateName:      template.Name,
-		Outdated:          workspaceBuild.TemplateVersionID.String() != template.ActiveVersionID.String(),
+		OwnerName:         workspaceBuild.OwnerName,
+		TemplateID:        workspaceBuild.TemplateID,
+		LatestBuild:       convertWorkspaceBuild(workspaceBuild, job),
+		TemplateName:      workspaceBuild.TemplateName,
+		Outdated:          workspaceBuild.TemplateVersionID.String() != workspaceBuild.TemplateActiveVersion.String(),
 		Name:              workspace.Name,
 		AutostartSchedule: autostartSchedule,
 		TTLMillis:         ttlMillis,
