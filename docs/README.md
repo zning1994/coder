@@ -1,5 +1,7 @@
 # Coder Documentation
 
+Lipsum
+
 ## Table of Contents
 
 - [About Coder](./about.md#about-coder)
