@@ -13,7 +13,7 @@ terraform {
 
 provider "google" {
   zone    = "us-south1-a"
-  project = "coder-dev-1"
+  project = "coder-dogfood"
 }
 
 data "google_compute_default_service_account" "default" {
@@ -31,6 +31,7 @@ resource "google_compute_disk" "root" {
   name  = "coder-${data.coder_workspace.me.owner}-${data.coder_workspace.me.name}-root"
   type  = "pd-ssd"
   image = data.google_compute_image.arch_image.self_link
+  size  = 50
   lifecycle {
     ignore_changes  = [image]
     prevent_destroy = false
@@ -46,7 +47,7 @@ resource "coder_agent" "dev" {
 resource "google_compute_instance" "dev" {
   count        = data.coder_workspace.me.start_count
   name         = "coder-${data.coder_workspace.me.owner}-${data.coder_workspace.me.name}"
-  machine_type = "e2-medium"
+  machine_type = "n2-standard-8"
   network_interface {
     network = "default"
     access_config {
@@ -61,21 +62,22 @@ resource "google_compute_instance" "dev" {
     email  = data.google_compute_default_service_account.default.email
     scopes = ["cloud-platform"]
   }
+  scheduling {
+    automatic_restart  = false
+    provisioning_model = "SPOT"
+    preemptible        = true
+  }
   # The startup script runs as root with no $HOME environment set up, which can break workspace applications, so
   # instead of directly running the agent init script, setup the home directory, write the init script, and then execute
   # it.
   metadata_startup_script = <<EOMETA
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 set -eux pipefail
 mkdir /root || true
 cat <<'EOCODER' > /root/coder_agent.sh
 ${coder_agent.dev.init_script}
 EOCODER
 chmod +x /root/coder_agent.sh
-
-pacman-key --init
-pacman-key --populate archlinux
-pacman -S which --noconfirm
 
 export HOME=/root
 /root/coder_agent.sh
