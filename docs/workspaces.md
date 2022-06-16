@@ -18,7 +18,7 @@ coder show <workspace-name>
 
 ## IDEs
 
-Coder [supports multiple IDEs](ides.md) for use with your workspaces.
+Coder [supports multiple IDEs](/workspaces/ides.md) for use with your workspaces.
 
 ## Workspace lifecycle
 
