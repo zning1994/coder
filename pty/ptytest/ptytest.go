@@ -75,13 +75,17 @@ type PTY struct {
 }
 
 func (p *PTY) ExpectMatch(str string) string {
+	return p.ExpectMatchWithTimeout(str, 10*time.Second)
+}
+
+func (p *PTY) ExpectMatchWithTimeout(str string, duration time.Duration) string {
 	var buffer bytes.Buffer
 	multiWriter := io.MultiWriter(&buffer, p.outputWriter)
 	runeWriter := bufio.NewWriterSize(multiWriter, utf8.UTFMax)
 	complete, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 	go func() {
-		timer := time.NewTimer(10 * time.Second)
+		timer := time.NewTimer(duration)
 		defer timer.Stop()
 		select {
 		case <-complete.Done():

@@ -21,11 +21,16 @@ import (
 // New creates a CLI instance with a configuration pointed to a
 // temporary testing directory.
 func New(t *testing.T, args ...string) (*cobra.Command, config.Root) {
-	cmd := cli.Root()
 	dir := t.TempDir()
 	root := config.Root(dir)
-	cmd.SetArgs(append([]string{"--global-config", dir}, args...))
-	return cmd, root
+	return NewWithConfig(t, root, args...), root
+}
+
+// NewWithConfig creates a CLI instance using the configuration directory provided.
+func NewWithConfig(t *testing.T, cfg config.Root, args ...string) *cobra.Command {
+	cmd := cli.Root()
+	cmd.SetArgs(append([]string{"--global-config", string(cfg)}, args...))
+	return cmd
 }
 
 // SetupConfig applies the URL and SessionToken of the client to the config.
