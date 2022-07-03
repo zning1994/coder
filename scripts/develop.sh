@@ -5,12 +5,7 @@
 set -euo pipefail
 
 export SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
-<<<<<<< HEAD
-echo "SCRIPT_DIR = ${SCRIPT_DIR}"
 . "${SCRIPT_DIR}/lib/develop-setup.sh"
-=======
-. "${SCRIPT_DIR}/scripts/lib/develop-setup.sh"
->>>>>>> ecbb9b8964af237140727c9f3f67317ca5fb878d
 
 # Compile the CLI binary once just so we don't waste time compiling things multiple times
 go build -o "${CODER_DEV_BIN}" "${PROJECT_ROOT}/cmd/coder"
@@ -29,11 +24,7 @@ go build -o "${CODER_DEV_BIN}" "${PROJECT_ROOT}/cmd/coder"
 	CODER_HOST=http://127.0.0.1:3000 INSPECT_XSTATE=true yarn --cwd=./site dev || kill -INT -$$ &
 	"${CODER_DEV_SHIM}" server --address 127.0.0.1:3000 --in-memory --tunnel || kill -INT -$$ &
 
-<<<<<<< HEAD
 	"${SCRIPT_DIR}/lib/develop-postflight.sh"
-=======
-	"${SCRIPT_DIR}/scripts/lib/develop-postflight.sh"
->>>>>>> ecbb9b8964af237140727c9f3f67317ca5fb878d
 
 	# Wait for both frontend and backend to exit.
 	wait
