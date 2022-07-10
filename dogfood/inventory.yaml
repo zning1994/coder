@@ -1,0 +1,11 @@
+all:
+  hosts:
+    alpha.ci.cdr.dev:
+    beta.ci.cdr.dev:
+  vars:
+    ansible_connection: ssh
+    ansible_user: coder
+  children:
+    masters:
+      hosts:
+        alpha.ci.cdr.dev:
