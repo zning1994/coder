@@ -1257,10 +1257,10 @@
     minimatch "^3.1.2"
     strip-json-comments "^3.1.1"
 
-"@fontsource/ibm-plex-mono@4.5.9":
-  version "4.5.9"
-  resolved "https://registry.yarnpkg.com/@fontsource/ibm-plex-mono/-/ibm-plex-mono-4.5.9.tgz#96968bebc4b1ea559818a9c52c87b3854a8145ba"
-  integrity sha512-goblhmAX48GELIUQnWBg6AKVZklcTUu6NwF8tRiIzlxTZuOspbzHrW/3sF3WOH6+mJVay9n6QLbbikOfxSRekQ==
+"@fontsource/ibm-plex-mono@4.5.10":
+  version "4.5.10"
+  resolved "https://registry.yarnpkg.com/@fontsource/ibm-plex-mono/-/ibm-plex-mono-4.5.10.tgz#25d004646853bf46b3787341300662fe61f8ad78"
+  integrity sha512-YmyewD+qHgo4ylcNSg6T9zpneRS34HhFd8cpF2TrJMbM3iKOW59XwmZqzdKyctzU0UQoHUFzjAAzDJ4THElFRA==
 
 "@fontsource/inter@4.5.11":
   version "4.5.11"
@@ -1749,12 +1749,13 @@
     tiny-glob "^0.2.9"
     tslib "^2.4.0"
 
-"@playwright/test@1.22.1":
-  version "1.22.1"
-  resolved "https://registry.yarnpkg.com/@playwright/test/-/test-1.22.1.tgz#78b4a7c13d8a7a0c6432672571d70c4d3963f027"
-  integrity sha512-8ouMBUboYslHom41W8bnSEn0TwlAMHhCACwOZeuiAgzukj7KobpZ+UBwrGE0jJ0UblJbKAQNRHXL+z7sDSkb6g==
+"@playwright/test@1.23.2":
+  version "1.23.2"
+  resolved "https://registry.yarnpkg.com/@playwright/test/-/test-1.23.2.tgz#6af9e77bafcfe6dd17c23a44b40f793db5245d74"
+  integrity sha512-umaEAIwQGfbezixg3raSOraqbQGSqZP988sOaMdpA2wj3Dr6ykOscrMukyK3U6edxhpS0N8kguAFZoHwCEfTig==
   dependencies:
-    playwright-core "1.22.1"
+    "@types/node" "*"
+    playwright-core "1.23.2"
 
 "@pmmmwh/react-refresh-webpack-plugin@0.5.6", "@pmmmwh/react-refresh-webpack-plugin@^0.5.1":
   version "0.5.6"
@@ -2792,10 +2793,10 @@
     lodash "^4.17.15"
     redent "^3.0.0"
 
-"@testing-library/react-hooks@8.0.0":
-  version "8.0.0"
-  resolved "https://registry.yarnpkg.com/@testing-library/react-hooks/-/react-hooks-8.0.0.tgz#7d0164bffce4647f506039de0a97f6fcbd20f4bf"
-  integrity sha512-uZqcgtcUUtw7Z9N32W13qQhVAD+Xki2hxbTR461MKax8T6Jr8nsUvZB+vcBTkzY2nFvsUet434CsgF0ncW2yFw==
+"@testing-library/react-hooks@8.0.1":
+  version "8.0.1"
+  resolved "https://registry.yarnpkg.com/@testing-library/react-hooks/-/react-hooks-8.0.1.tgz#0924bbd5b55e0c0c0502d1754657ada66947ca12"
+  integrity sha512-Aqhl2IVmLt8IovEVarNDFuJDVWVvhnr9/GCU6UUnrYXwgDFF9h2L2o2P9KBni1AST5sT6riAyoukFLyjQUgD/g==
   dependencies:
     "@babel/runtime" "^7.12.5"
     react-error-boundary "^3.1.0"
@@ -10941,10 +10942,10 @@ pkg-dir@^5.0.0:
   dependencies:
     find-up "^5.0.0"
 
-playwright-core@1.22.1:
-  version "1.22.1"
-  resolved "https://registry.yarnpkg.com/playwright-core/-/playwright-core-1.22.1.tgz#59ddf903546171fdfd9c3dc189630c883619667c"
-  integrity sha512-H+ZUVYnceWNXrRf3oxTEKAr81QzFsCKu5Fp//fEjQvqgKkfA1iX3E9DBrPJpPNOrgVzcE+IqeI0fDmYJe6Ynnw==
+playwright-core@1.23.2:
+  version "1.23.2"
+  resolved "https://registry.yarnpkg.com/playwright-core/-/playwright-core-1.23.2.tgz#ddc15b3251e42ee0eed82a96ece3f7b2641d75a4"
+  integrity sha512-UGbutIr0nBALDHWW/HcXfyK6ZdmefC99Moo4qyTr89VNIkYZuDrW8Sw554FyFUamcFSdKOgDPk6ECSkofGIZjQ==
 
 pnp-webpack-plugin@1.6.4:
   version "1.6.4"
@@ -13459,10 +13460,10 @@ ts-jest@27.1.4:
     semver "7.x"
     yargs-parser "20.x"
 
-ts-loader@9.3.0:
-  version "9.3.0"
-  resolved "https://registry.yarnpkg.com/ts-loader/-/ts-loader-9.3.0.tgz#980f4dbfb60e517179e15e10ed98e454b132159f"
-  integrity sha512-2kLLAdAD+FCKijvGKi9sS0OzoqxLCF3CxHpok7rVgCZ5UldRzH0TkbwG9XECKjBzHsAewntC5oDaI/FwKzEUog==
+ts-loader@9.3.1:
+  version "9.3.1"
+  resolved "https://registry.yarnpkg.com/ts-loader/-/ts-loader-9.3.1.tgz#fe25cca56e3e71c1087fe48dc67f4df8c59b22d4"
+  integrity sha512-OkyShkcZTsTwyS3Kt7a4rsT/t2qvEVQuKCTg4LJmpj9fhFR7ukGdZwV6Qq3tRUkqcXtfGpPR7+hFKHCG/0d3Lw==
   dependencies:
     chalk "^4.1.0"
     enhanced-resolve "^5.0.0"
